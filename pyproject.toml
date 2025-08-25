@@ -1,0 +1,133 @@
+[project]
+name = "fortunamind-persistent-mcp"
+version = "1.0.0"
+description = "Persistent MCP server with advanced technical analysis and trading journal"
+authors = [
+    {name = "FortunaMind Team", email = "dev@fortunamind.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "Proprietary"}
+keywords = ["mcp", "trading", "technical-analysis", "journal", "crypto"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "sqlalchemy>=2.0.23",
+    "alembic>=1.13.0",
+    "asyncpg>=0.29.0",
+    "supabase>=2.0.0",
+    "mcp>=0.4.0",
+    "cryptography>=41.0.0",
+    "httpx>=0.25.0",
+    "pandas>=2.1.0",
+    "numpy>=1.24.0",
+    "python-dotenv>=1.0.0",
+    "structlog>=23.2.0",
+    "talib-binary>=0.4.26"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0", 
+    "pytest-cov>=4.1.0",
+    "black>=23.11.0",
+    "isort>=5.12.0",
+    "flake8>=6.1.0",
+    "mypy>=1.7.0",
+    "bandit>=1.7.5",
+    "pre-commit>=3.6.0"
+]
+
+[project.scripts]
+persistent-mcp = "src.main:main"
+
+[project.urls]
+Homepage = "https://github.com/awinskill/fortunamind-persistent-mcp"
+Repository = "https://github.com/awinskill/fortunamind-persistent-mcp.git"
+Issues = "https://github.com/awinskill/fortunamind-persistent-mcp/issues"
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["src", "fortunamind_core"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "--cov=src --cov-report=term-missing --cov-report=html"
+asyncio_mode = "auto"
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101", "B601"]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "src/framework/*"  # Exclude symlinked framework
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]

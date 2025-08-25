@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  fortunamind-mcp-http:
+    build:
+      context: .
+      dockerfile: Dockerfile.http
+    container_name: fortunamind-mcp-http
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Server Configuration
+      - SERVER_MODE=http
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      
+      # MCP Server Name
+      - MCP_SERVER_NAME=FortunaMind-Persistent-MCP-HTTP
+      
+      # Database Configuration (required)
+      - DATABASE_URL=${DATABASE_URL}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      
+      # Security Configuration
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ALGORITHM=HS256
+      - SECURITY_PROFILE=STRICT
+      
+      # Subscription API Configuration
+      - SUBSCRIPTION_API_URL=${SUBSCRIPTION_API_URL:-https://api.fortunamind.com/v1/subscriptions}
+      - SUBSCRIPTION_API_KEY=${SUBSCRIPTION_API_KEY}
+      
+      # Feature Flags
+      - ENABLE_TRADING_JOURNAL=true
+      - ENABLE_TECHNICAL_INDICATORS=true
+      - ENABLE_PORTFOLIO_INTEGRATION=true
+      - ENABLE_PRE_TRADE_ANALYSIS=true
+      
+      # Rate Limiting
+      - API_RATE_LIMIT_PER_MINUTE=60
+      - MAX_JOURNAL_ENTRY_LENGTH=2000
+      
+      # Logging
+      - LOG_FORMAT=json
+      - LOG_FILE_PATH=logs/persistent-mcp-http.log
+      
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    networks:
+      - fortunamind-network
+
+  # Optional: Add a reverse proxy for production
+  nginx:
+    image: nginx:alpine
+    container_name: fortunamind-mcp-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/ssl/certs:ro
+    depends_on:
+      - fortunamind-mcp-http
+    networks:
+      - fortunamind-network
+    profiles:
+      - production
+
+networks:
+  fortunamind-network:
+    driver: bridge
+
+volumes:
+  logs:
+  data:

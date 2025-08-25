@@ -1,0 +1,207 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run security scan every Sunday at 2 AM UTC
+    - cron: '0 2 * * 0'
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install bandit safety semgrep
+    
+    # Bandit - Python security linter
+    - name: Run Bandit security scan
+      run: |
+        echo "🔒 Running Bandit security scan..."
+        bandit -r src/ -f json -o bandit-results.json -l -i
+        bandit -r src/ -f txt -o bandit-results.txt -l -i || true
+    
+    # Safety - Check dependencies for known vulnerabilities
+    - name: Run Safety vulnerability check
+      run: |
+        echo "🛡️ Checking dependencies for known vulnerabilities..."
+        safety check --json --output safety-results.json || true
+        safety check --output safety-results.txt || true
+    
+    # Semgrep - Advanced static analysis
+    - name: Run Semgrep security scan
+      run: |
+        echo "🔍 Running Semgrep advanced security analysis..."
+        semgrep --config=auto src/ --json --output=semgrep-results.json || true
+        semgrep --config=auto src/ --output=semgrep-results.txt || true
+    
+    # TruffleHog - Secrets detection
+    - name: Run TruffleHog secrets scan
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: ${{ github.event.repository.default_branch }}
+        head: HEAD
+        extra_args: --debug --only-verified
+    
+    # Trivy - Vulnerability scanner for containers and filesystems
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        severity: 'CRITICAL,HIGH,MEDIUM'
+    
+    # Upload SARIF results to GitHub Security tab
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+    
+    # Custom security checks for our specific requirements
+    - name: Custom FortunaMind security checks
+      run: |
+        echo "🎯 Running FortunaMind-specific security checks..."
+        
+        # Check for API key patterns that shouldn't be in code
+        echo "Checking for hardcoded API keys..."
+        if grep -r "organizations/.*apiKeys" src/ --exclude-dir=__pycache__ || \
+           grep -r "sk_live_" src/ --exclude-dir=__pycache__ || \
+           grep -r "pk_live_" src/ --exclude-dir=__pycache__ ; then
+          echo "❌ Found potential API keys in source code!"
+          exit 1
+        else
+          echo "✅ No hardcoded API keys found"
+        fi
+        
+        # Check for database credentials
+        echo "Checking for hardcoded database credentials..."
+        if grep -r "postgresql://.*:.*@" src/ --exclude-dir=__pycache__ | grep -v "example" ; then
+          echo "❌ Found potential database credentials in source code!"
+          exit 1
+        else
+          echo "✅ No hardcoded database credentials found"
+        fi
+        
+        # Check for common injection patterns
+        echo "Checking for potential injection vulnerabilities..."
+        if grep -r "execute.*%.*%" src/ --exclude-dir=__pycache__ || \
+           grep -r "query.*format" src/ --exclude-dir=__pycache__ ; then
+          echo "⚠️ Found potential SQL injection patterns - please review"
+        else
+          echo "✅ No obvious injection patterns found"
+        fi
+        
+        # Check for insecure random usage
+        echo "Checking for insecure random number generation..."
+        if grep -r "import random" src/ --exclude-dir=__pycache__ || \
+           grep -r "random\." src/ --exclude-dir=__pycache__ ; then
+          echo "⚠️ Found usage of 'random' module - consider 'secrets' for cryptographic use"
+        fi
+        
+        # Ensure security scanner is integrated
+        echo "Checking security scanner integration..."
+        if ! grep -r "SecurityScanner\|security_scanner" src/ --exclude-dir=__pycache__ ; then
+          echo "⚠️ Security scanner integration not found - ensure it's properly integrated"
+        else
+          echo "✅ Security scanner integration found"
+        fi
+    
+    - name: Upload security scan results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-scan-results-${{ github.run_id }}
+        path: |
+          bandit-results.json
+          bandit-results.txt
+          safety-results.json
+          safety-results.txt
+          semgrep-results.json
+          semgrep-results.txt
+          trivy-results.sarif
+    
+    - name: Security scan summary
+      if: always()
+      run: |
+        echo "🔒 Security Scan Summary"
+        echo "========================"
+        
+        if [ -f bandit-results.txt ]; then
+          echo "📊 Bandit Results:"
+          tail -10 bandit-results.txt || echo "No Bandit results"
+        fi
+        
+        if [ -f safety-results.txt ]; then
+          echo "📊 Safety Results:"
+          tail -10 safety-results.txt || echo "No Safety results"
+        fi
+        
+        echo "✅ Security scan completed. Check artifacts for detailed results."
+
+  dependency-review:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Dependency Review
+      uses: actions/dependency-review-action@v3
+      with:
+        fail-on-severity: moderate
+        allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC
+        
+  codeql-analysis:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['python']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      with:
+        languages: ${{ matrix.language }}
+        queries: security-extended,security-and-quality
+    
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v2
+    
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+      with:
+        category: "/language:${{matrix.language}}"
