@@ -1,0 +1,110 @@
+services:
+  # FortunaMind Persistent MCP HTTP Server
+  - type: web
+    name: fortunamind-persistent-mcp
+    runtime: python3
+    buildCommand: pip install -r requirements.txt
+    startCommand: python src/http_server.py
+    plan: starter
+    region: oregon
+    branch: main
+    rootDir: .
+    
+    # Environment Configuration
+    envVars:
+      # Server Configuration
+      - key: SERVER_MODE
+        value: http
+      - key: SERVER_HOST
+        value: 0.0.0.0
+      - key: SERVER_PORT
+        value: 10000
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: LOG_FORMAT
+        value: json
+        
+      # MCP Server Name
+      - key: MCP_SERVER_NAME
+        value: FortunaMind-Persistent-MCP-Production
+        
+      # Database Configuration (from Render environment variables)
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fortunamind-persistent-db
+          property: connectionString
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+        
+      # Security Configuration  
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: SECURITY_PROFILE
+        value: STRICT
+        
+      # Subscription API Configuration
+      - key: SUBSCRIPTION_API_URL
+        value: https://api.fortunamind.com/v1/subscriptions
+      - key: SUBSCRIPTION_API_KEY
+        sync: false
+        
+      # Feature Flags
+      - key: ENABLE_TRADING_JOURNAL
+        value: true
+      - key: ENABLE_TECHNICAL_INDICATORS
+        value: true
+      - key: ENABLE_PORTFOLIO_INTEGRATION
+        value: true
+      - key: ENABLE_PRE_TRADE_ANALYSIS
+        value: true
+      - key: ENABLE_ADVANCED_ANALYTICS
+        value: false
+      - key: ENABLE_PREDICTIVE_INSIGHTS
+        value: false
+        
+      # Rate Limiting
+      - key: API_RATE_LIMIT_PER_MINUTE
+        value: 100
+      - key: MAX_JOURNAL_ENTRY_LENGTH
+        value: 2000
+        
+      # Render-specific Configuration
+      - key: RENDER
+        value: true
+      - key: PORT
+        value: 10000
+    
+    # Health Check Configuration
+    healthCheckPath: /health
+    
+    # Build Configuration
+    buildFilter:
+      paths:
+      - src/**
+      - requirements.txt
+      - pyproject.toml
+      - .env.example
+      ignoredPaths:
+      - docs/**
+      - tests/**
+      - scripts/**
+      - "*.md"
+
+  # Optional: PostgreSQL Database (if not using Supabase)
+  # - type: pserv
+  #   name: fortunamind-persistent-db
+  #   runtime: postgresql
+  #   plan: starter
+  #   region: oregon
+  #   ipAllowList: []
+  #   databases:
+  #     - name: fortunamind_persistent
+  #       user: fortunamind_user
