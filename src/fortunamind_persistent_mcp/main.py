@@ -11,32 +11,20 @@ import os
 import sys
 from pathlib import Path
 
-# Add src directory to Python path for development
-src_dir = Path(__file__).parent
-sys.path.insert(0, str(src_dir))
+# Path imports no longer needed with proper package structure
 
 try:
-    # Import from framework via safe proxy
-    from framework_proxy import get_framework, unified_tools, core_interfaces
-    framework = get_framework()
-    framework_tools = unified_tools()
-    framework_core = core_interfaces()
-    
-    # Check if we can access the unified tools
-    if hasattr(framework_tools, 'UnifiedPortfolioTool'):
-        FRAMEWORK_AVAILABLE = True
-        print(f"✅ Framework loaded from: {framework.framework_path}")
-    else:
-        FRAMEWORK_AVAILABLE = False
-        print("⚠️ Framework tools not accessible")
-        
+    # Import framework proxy but don't call it at import time
+    from fortunamind_persistent_mcp.framework_proxy import get_framework, unified_tools, core_interfaces
+    FRAMEWORK_AVAILABLE = True
+    print("✅ Framework proxy available")
 except Exception as e:
-    print(f"⚠️ Framework not available: {e}")
+    print(f"⚠️ Framework proxy not available: {e}")
     print("This is expected during initial development setup.")
     FRAMEWORK_AVAILABLE = False
 
-from config import get_settings
-from persistent_mcp.server import PersistentMCPServer
+from fortunamind_persistent_mcp.config import get_settings
+from fortunamind_persistent_mcp.persistent_mcp.server import PersistentMCPServer
 
 
 def print_banner():

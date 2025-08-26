@@ -16,12 +16,23 @@ from fortunamind_persistent_mcp.config import Settings
 
 try:
     from fortunamind_persistent_mcp.framework_proxy import unified_tools
-    framework_tools = unified_tools()
-    UnifiedPricesTool = framework_tools.UnifiedPricesTool
     FRAMEWORK_AVAILABLE = True
 except ImportError:
-    from fortunamind_persistent_mcp.core.mock import UnifiedPricesTool
     FRAMEWORK_AVAILABLE = False
+
+# Initialize framework tools at runtime, not import time
+def _get_prices_tool():
+    """Get prices tool - framework or mock"""
+    if FRAMEWORK_AVAILABLE:
+        try:
+            framework_tools = unified_tools()
+            return framework_tools.UnifiedPricesTool
+        except Exception:
+            pass
+    
+    # Fallback to mock
+    from fortunamind_persistent_mcp.core.mock import UnifiedPricesTool
+    return UnifiedPricesTool
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +75,11 @@ class TechnicalIndicatorsTool(ReadOnlyTool):
         super().__init__(settings, storage)
         
         # Initialize price tool for market data
-        if FRAMEWORK_AVAILABLE:
-            self.price_tool = UnifiedPricesTool()
-        else:
+        try:
+            PricesTool = _get_prices_tool()
+            self.price_tool = PricesTool()
+        except Exception as e:
+            logger.warning(f"Failed to initialize prices tool: {e}")
             self.price_tool = None
         
         logger.info("Technical indicators tool initialized")
