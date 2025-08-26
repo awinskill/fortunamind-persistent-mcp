@@ -1,38 +1,45 @@
-# FortunaMind Persistent MCP Server Docker Configuration
-# Multi-stage build for production optimization
-FROM python:3.11-slim AS base
+# FortunaMind Persistent MCP Server - Render Optimized Dockerfile
+# Single-stage build optimized for Render.com deployment
+FROM python:3.11-slim
 
-# Set environment variables for Python
+# Set environment variables for Python (PORT will be set by Render)
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    ENVIRONMENT=production \
+    LOG_LEVEL=INFO \
+    MCP_SERVER_NAME="FortunaMind-Persistent-MCP-Production"
 
 # Create non-root user for security
 RUN groupadd --gid 1000 mcpuser && \
     useradd --uid 1000 --gid mcpuser --shell /bin/bash --create-home mcpuser
 
-# Install system dependencies
+# Install system dependencies including git for version generation
 RUN apt-get update && apt-get install -y \
     curl \
     ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    git \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 # Set working directory
 WORKDIR /app
 
-# Copy requirements and install Python dependencies
+# Copy requirements and install Python dependencies first (for better caching)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# Copy application source code
 COPY src/ ./src/
-COPY .env.example ./
-COPY *.md ./
-COPY *.toml ./
 
-# Create logs directory
-RUN mkdir -p /app/logs && chown -R mcpuser:mcpuser /app
+# Copy configuration files
+COPY pyproject.toml ./
+
+# Create logs directory and set proper permissions
+RUN mkdir -p /app/logs && \
+    chown -R mcpuser:mcpuser /app
 
 # Switch to non-root user
 USER mcpuser
@@ -40,55 +47,13 @@ USER mcpuser
 # Set PYTHONPATH
 ENV PYTHONPATH=/app
 
-# Health check for container orchestration
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+# Comprehensive health check using PORT environment variable support
+HEALTHCHECK --interval=30s --timeout=15s --start-period=90s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8080}/health || exit 1
 
-# Expose MCP server port
+# Expose default port (Render will set PORT dynamically)
 EXPOSE 8080
 
-# Default command - can be overridden
-CMD ["python", "src/http_server.py"]
-
-# =============================================================================
-# Production stage with additional optimizations
-# =============================================================================
-FROM base AS production
-
-# Production environment variables
-ENV ENVIRONMENT=production \
-    LOG_LEVEL=INFO \
-    MCP_SERVER_NAME="FortunaMind-Persistent-MCP-Production"
-
-# Enhanced health check for production
-HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=5 \
-    CMD curl -f http://localhost:8080/health || exit 1
-
-# Production command
-CMD ["python", "src/http_server.py"]
-
-# =============================================================================
-# Development stage with debugging tools
-# =============================================================================
-FROM base AS development
-
-# Development environment variables
-ENV ENVIRONMENT=development \
-    LOG_LEVEL=DEBUG \
-    MCP_SERVER_NAME="FortunaMind-Persistent-MCP-Dev"
-
-# Install development dependencies
-COPY requirements-dev.txt .
-RUN pip install --no-cache-dir -r requirements-dev.txt || true
-
-# Install development tools
-RUN pip install --no-cache-dir \
-    ipython \
-    pytest \
-    pytest-cov \
-    black \
-    isort \
-    mypy || true
-
-# Development command with more verbose output
-CMD ["python", "src/http_server.py"]
+# Production command optimized for Render
+# Use the direct HTTP server startup script
+CMD python src/http_server.py
