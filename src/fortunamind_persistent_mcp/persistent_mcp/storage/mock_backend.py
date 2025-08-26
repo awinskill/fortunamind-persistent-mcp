@@ -12,7 +12,7 @@ import uuid
 # Note: Template pattern temporarily disabled due to circular imports
 # from core.storage_template import InMemoryStorageTemplate
 from .interface import StorageInterface, StorageRecord, QueryFilter, DataType
-from config import Settings
+from fortunamind_persistent_mcp.config import Settings
 
 logger = logging.getLogger(__name__)
 

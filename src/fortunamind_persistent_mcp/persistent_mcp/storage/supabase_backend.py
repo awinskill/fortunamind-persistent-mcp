@@ -19,7 +19,7 @@ except ImportError:
     Client = None
 
 from .interface import StorageInterface, StorageRecord, QueryFilter, DataType
-from config import Settings
+from fortunamind_persistent_mcp.config import Settings
 
 logger = logging.getLogger(__name__)
 

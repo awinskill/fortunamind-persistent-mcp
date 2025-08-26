@@ -9,7 +9,7 @@ import logging
 from typing import Dict, Any, Optional, Type, TypeVar, Callable
 from abc import ABC, abstractmethod
 
-from config import Settings
+from fortunamind_persistent_mcp.config import Settings
 
 logger = logging.getLogger(__name__)
 

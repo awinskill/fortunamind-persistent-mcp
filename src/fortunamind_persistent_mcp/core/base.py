@@ -21,8 +21,8 @@ except ImportError:
     from .mock import AuthContext, ToolResult, ToolSchema, ReadOnlyTool as FrameworkReadOnlyTool, WriteEnabledTool as FrameworkWriteEnabledTool
     FRAMEWORK_AVAILABLE = False
 
-from config import Settings
-from core.security import SecurityScanner, SecurityThreat, ThreatLevel
+from fortunamind_persistent_mcp.config import Settings
+from .security import SecurityScanner, SecurityThreat, ThreatLevel
 
 logger = logging.getLogger(__name__)
 
