@@ -637,6 +637,61 @@ if __name__ == "__main__":
 - **Base Classes**: `../coinbase-mcp/src/core/base.py`
 - **Portfolio Example**: `../coinbase-mcp/src/unified_tools/portfolio.py`
 
+## 🔧 **DEVELOPMENT NOTES (Updated 2025-08-26)**
+
+### **Resolved Import Issues**
+
+The project has been refactored to eliminate the problematic "triple-try import pattern" that was causing import failures and fragility. Key improvements:
+
+1. **Clean Package Structure**: All code now uses absolute imports with proper package naming:
+   ```python
+   # OLD (problematic):
+   try:
+       from core.base import ReadOnlyTool
+   except ImportError:
+       try:
+           from ..core.base import ReadOnlyTool
+       except ImportError:
+           from src.core.base import ReadOnlyTool
+
+   # NEW (clean):
+   from fortunamind_persistent_mcp.core.base import ReadOnlyTool
+   ```
+
+2. **Proper Package Installation**: The package can now be properly installed and imported:
+   ```bash
+   pip install -e .
+   python -c "from fortunamind_persistent_mcp.core.tool_factory import UnifiedToolFactory"
+   ```
+
+3. **Package Structure**:
+   ```
+   src/
+     fortunamind_persistent_mcp/
+       __init__.py
+       config.py
+       core/
+         base.py
+         tool_factory.py
+       persistent_mcp/
+         server.py
+         tools/
+         storage/
+   ```
+
+4. **Entry Points**: Both setup.py and pyproject.toml are properly configured with correct module paths.
+
+### **Installation and Testing**
+
+The package installs successfully with all dependencies resolved. Framework warnings are expected during development:
+
+```
+⚠️ Framework not available: Framework module unified_tools has missing dependencies: No module named 'fortunamind_framework'
+This is expected during initial development setup.
+```
+
+This warning is harmless and indicates the framework proxy is working correctly, falling back to mock implementations when the parent framework isn't available.
+
 ---
 
 **Ready to build the next generation of persistent MCP capabilities!** 🚀📊

@@ -9,44 +9,35 @@ import asyncio
 import logging
 from typing import Dict, List, Optional, Any, Union
 
-try:
-    from framework.core.registry import ToolRegistry
-    from framework.core.interfaces import AuthContext, ToolResult
-    from framework.unified_tools import (
-        UnifiedPortfolioTool,
-        UnifiedPricesTool, 
-        UnifiedMarketResearchTool,
-    )
-    FRAMEWORK_AVAILABLE = True
-except ImportError:
-    # Mock classes for development without framework
-    class ToolRegistry:
-        def __init__(self):
-            self.tools = {}
-        def register(self, tool): pass
-        def get_tools(self): return []
-    
-    class AuthContext:
-        def __init__(self, **kwargs):
-            for k, v in kwargs.items():
-                setattr(self, k, v)
-    
-    class ToolResult:
-        def __init__(self, success=True, data=None, error_message=None):
-            self.success = success
-            self.data = data
-            self.error_message = error_message
-    
-    FRAMEWORK_AVAILABLE = False
-
-from config import Settings
-from .adapters import MCPStdioAdapter, MCPHttpAdapter
-from .storage import StorageBackend
-from .auth import SubscriberAuth
-from .tools import TechnicalIndicatorsTool, TradingJournalTool
-
-
+# Set up logging first
 logger = logging.getLogger(__name__)
+
+# Framework components will be loaded at runtime
+# For now, always use mock classes and detect framework availability later
+FRAMEWORK_AVAILABLE = False
+
+try:
+    # Try to access framework proxy to see if it works
+    from fortunamind_persistent_mcp.framework_proxy import get_framework
+    framework = get_framework()
+    if framework.framework_path.exists():
+        # Framework is accessible, we'll load components at runtime
+        logger.info(f"Framework detected at: {framework.framework_path}")
+        FRAMEWORK_AVAILABLE = True
+    else:
+        logger.warning("Framework path not found")
+except Exception as e:
+    logger.warning(f"Framework proxy not available: {e}")
+
+# Clean imports using proper package structure
+from fortunamind_persistent_mcp.core.mock import ToolRegistry, AuthContext, ToolResult
+from fortunamind_persistent_mcp.config import Settings
+from .adapters import MCPStdioAdapter, MCPHttpAdapter
+from .storage.interface import StorageInterface
+from .auth import SubscriberAuth
+from .tools.technical_indicators import TechnicalIndicatorsTool
+from .tools.trading_journal import TradingJournalTool
+from .tools.persistent_portfolio import PersistentPortfolioTool
 
 
 class PersistentMCPServer:
@@ -69,7 +60,7 @@ class PersistentMCPServer:
         self.settings = settings
         self.server_mode = server_mode
         self.registry = ToolRegistry()
-        self.storage: Optional[StorageBackend] = None
+        self.storage: Optional[StorageInterface] = None
         self.auth: Optional[SubscriberAuth] = None
         self.adapter: Optional[Union[MCPStdioAdapter, MCPHttpAdapter]] = None
         
@@ -129,47 +120,75 @@ class PersistentMCPServer:
         logger.info("🎯 Server initialization complete")
     
     async def _register_tools(self):
-        """Register all available tools"""
-        logger.info("Registering tools...")
+        """Register all available tools using the extensible factory pattern"""
+        logger.info("Registering tools using unified factory...")
         
-        tools_registered = 0
+        # Import the tool factory
+        from fortunamind_persistent_mcp.core.tool_factory import UnifiedToolFactory, ToolType, create_all_available_tools
         
-        # Register framework tools if available
-        if FRAMEWORK_AVAILABLE:
-            if self.settings.enable_technical_indicators:
-                self.registry.register(UnifiedPricesTool())
-                tools_registered += 1
-                
-            if self.settings.enable_portfolio_integration:
-                self.registry.register(UnifiedPortfolioTool())
-                tools_registered += 1
-                
-            self.registry.register(UnifiedMarketResearchTool())
-            tools_registered += 1
-            
-            logger.info(f"✅ Registered {tools_registered} framework tools")
+        # Create factory with our storage and settings
+        factory = UnifiedToolFactory(storage=self.storage, settings=self.settings)
         
-        # Register persistent-specific tools
-        persistent_tools = 0
+        # Show available implementations
+        available_tools = factory.get_available_tools()
+        logger.info(f"Available tool implementations: {len(available_tools)} tool types")
+        for tool_type, implementations in available_tools.items():
+            logger.debug(f"  {tool_type}: {implementations}")
+        
+        # Register tools based on settings
+        total_tools = 0
+        
+        # Core tools (always enabled)
+        core_tools = [ToolType.PRICES, ToolType.MARKET_RESEARCH]
+        for tool_type in core_tools:
+            try:
+                tool = factory.create_tool(tool_type)
+                self.registry.register(tool)
+                total_tools += 1
+                logger.debug(f"Registered core tool: {tool_type}")
+            except Exception as e:
+                logger.warning(f"Failed to register core tool {tool_type}: {e}")
+        
+        # Conditional tools based on settings
+        if self.settings.enable_portfolio_integration:
+            try:
+                portfolio_tool = factory.create_tool(ToolType.PORTFOLIO)
+                self.registry.register(portfolio_tool)
+                total_tools += 1
+                logger.debug("Registered portfolio tool")
+            except Exception as e:
+                logger.warning(f"Failed to register portfolio tool: {e}")
         
         if self.settings.enable_technical_indicators:
-            tech_tool = TechnicalIndicatorsTool(
-                storage=self.storage,
-                settings=self.settings
-            )
-            self.registry.register(tech_tool)
-            persistent_tools += 1
-            
-        if self.settings.enable_trading_journal:
-            journal_tool = TradingJournalTool(
-                storage=self.storage,
-                settings=self.settings
-            )
-            self.registry.register(journal_tool)
-            persistent_tools += 1
+            try:
+                tech_tool = factory.create_tool(ToolType.TECHNICAL_INDICATORS)
+                self.registry.register(tech_tool)
+                total_tools += 1
+                logger.debug("Registered technical indicators tool")
+            except Exception as e:
+                logger.warning(f"Failed to register technical indicators tool: {e}")
         
-        logger.info(f"✅ Registered {persistent_tools} persistent tools")
-        logger.info(f"🔧 Total tools available: {tools_registered + persistent_tools}")
+        if self.settings.enable_trading_journal:
+            try:
+                journal_tool = factory.create_tool(ToolType.TRADING_JOURNAL)
+                self.registry.register(journal_tool)
+                total_tools += 1
+                logger.debug("Registered trading journal tool")
+            except Exception as e:
+                logger.warning(f"Failed to register trading journal tool: {e}")
+        
+        logger.info(f"✅ Registered {total_tools} tools successfully")
+        
+        if total_tools == 0:
+            logger.error("❌ No tools registered! Server will not be functional.")
+            # Register at least one mock tool so server can start
+            try:
+                mock_tool = factory.create_tool(ToolType.PRICES)  # Will create mock
+                self.registry.register(mock_tool)
+                logger.info("⚠️ Registered emergency mock tool to allow server startup")
+            except Exception as e:
+                logger.error(f"Cannot even create mock tools: {e}")
+                raise RuntimeError("Server cannot start - no tools available")
     
     async def start(self):
         """Start the MCP server"""

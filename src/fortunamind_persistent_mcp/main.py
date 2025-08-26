@@ -16,15 +16,21 @@ src_dir = Path(__file__).parent
 sys.path.insert(0, str(src_dir))
 
 try:
-    # Try to import from framework (symlinked)
-    from framework.core.registry import ToolRegistry
-    from framework.unified_tools import (
-        UnifiedPortfolioTool,
-        UnifiedPricesTool,
-        UnifiedMarketResearchTool,
-    )
-    FRAMEWORK_AVAILABLE = True
-except ImportError as e:
+    # Import from framework via safe proxy
+    from framework_proxy import get_framework, unified_tools, core_interfaces
+    framework = get_framework()
+    framework_tools = unified_tools()
+    framework_core = core_interfaces()
+    
+    # Check if we can access the unified tools
+    if hasattr(framework_tools, 'UnifiedPortfolioTool'):
+        FRAMEWORK_AVAILABLE = True
+        print(f"✅ Framework loaded from: {framework.framework_path}")
+    else:
+        FRAMEWORK_AVAILABLE = False
+        print("⚠️ Framework tools not accessible")
+        
+except Exception as e:
     print(f"⚠️ Framework not available: {e}")
     print("This is expected during initial development setup.")
     FRAMEWORK_AVAILABLE = False

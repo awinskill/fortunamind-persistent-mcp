@@ -10,17 +10,18 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 
+from fortunamind_persistent_mcp.core.base import ReadOnlyTool, ToolExecutionContext, ToolSchema, AuthContext
+from fortunamind_persistent_mcp.persistent_mcp.storage.interface import StorageInterface
+from fortunamind_persistent_mcp.config import Settings
+
 try:
-    from framework.core.interfaces import AuthContext, ToolResult, ToolSchema
-    from framework.core.base import ReadOnlyTool
-    from framework.unified_tools import UnifiedPricesTool
+    from fortunamind_persistent_mcp.framework_proxy import unified_tools
+    framework_tools = unified_tools()
+    UnifiedPricesTool = framework_tools.UnifiedPricesTool
     FRAMEWORK_AVAILABLE = True
 except ImportError:
-    from core.mock import AuthContext, ToolResult, ToolSchema, ReadOnlyTool, UnifiedPricesTool
+    from fortunamind_persistent_mcp.core.mock import UnifiedPricesTool
     FRAMEWORK_AVAILABLE = False
-
-from ..storage import StorageBackend
-from config import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,7 @@ class TechnicalIndicatorsTool(ReadOnlyTool):
     who may have 0-2 years of crypto experience.
     """
     
-    def __init__(self, storage: StorageBackend, settings: Settings):
+    def __init__(self, storage: StorageInterface, settings: Settings):
         """
         Initialize technical indicators tool
         
@@ -60,9 +61,7 @@ class TechnicalIndicatorsTool(ReadOnlyTool):
             storage: Storage backend for persistence
             settings: Application settings
         """
-        super().__init__()
-        self.storage = storage
-        self.settings = settings
+        super().__init__(settings, storage)
         
         # Initialize price tool for market data
         if FRAMEWORK_AVAILABLE:
@@ -150,13 +149,13 @@ Perfect for crypto-curious professionals who want to understand market trends wi
             }
         )
     
-    async def _execute_impl(self, auth_context: Optional[AuthContext], **parameters) -> Any:
+    async def _execute_impl(self, context: ToolExecutionContext) -> Any:
         """Execute technical indicators analysis"""
-        symbol = parameters.get("symbol", "").upper()
-        timeframe = parameters.get("timeframe", "7d")
-        include_education = parameters.get("include_education", True)
-        save_to_history = parameters.get("save_to_history", True)
-        compare_with_portfolio = parameters.get("compare_with_portfolio", False)
+        symbol = context.parameters.get("symbol", "").upper()
+        timeframe = context.parameters.get("timeframe", "7d")
+        include_education = context.parameters.get("include_education", True)
+        save_to_history = context.parameters.get("save_to_history", True)
+        compare_with_portfolio = context.parameters.get("compare_with_portfolio", False)
         
         logger.info(f"Calculating technical indicators for {symbol} ({timeframe})")
         
@@ -169,7 +168,7 @@ Perfect for crypto-curious professionals who want to understand market trends wi
                 }
             
             # Get historical price data
-            price_data = await self._get_price_data(symbol, timeframe, auth_context, parameters)
+            price_data = await self._get_price_data(symbol, timeframe, context.auth_context, context.parameters)
             if not price_data:
                 return {
                     "error": "Unable to fetch price data",
@@ -187,16 +186,16 @@ Perfect for crypto-curious professionals who want to understand market trends wi
             indicators["beginner_tips"] = self._generate_beginner_tips(indicators, symbol)
             
             # Compare with portfolio if requested
-            if compare_with_portfolio and auth_context:
+            if compare_with_portfolio and context.auth_context:
                 portfolio_comparison = await self._compare_with_portfolio(
-                    symbol, indicators, auth_context, parameters
+                    symbol, indicators, context.auth_context, context.parameters
                 )
                 if portfolio_comparison:
                     indicators["portfolio_context"] = portfolio_comparison
             
             # Save to history if requested and authenticated
-            if save_to_history and auth_context:
-                await self._save_to_history(auth_context.user_id_hash, symbol, indicators)
+            if save_to_history and context.auth_context:
+                await self._save_to_history(context.auth_context.user_id_hash, symbol, indicators)
             
             # Add metadata
             indicators["metadata"] = {

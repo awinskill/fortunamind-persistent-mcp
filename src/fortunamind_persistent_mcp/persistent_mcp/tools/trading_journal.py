@@ -13,16 +13,11 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass
 from enum import Enum
 
-try:
-    from framework.core.interfaces import AuthContext, ToolResult, ToolSchema
-    from framework.core.base import ReadOnlyTool, WriteEnabledTool
-    FRAMEWORK_AVAILABLE = True
-except ImportError:
-    from core.mock import AuthContext, ToolResult, ToolSchema, ReadOnlyTool, WriteEnabledTool
-    FRAMEWORK_AVAILABLE = False
-
-from ..storage import StorageBackend
-from config import Settings
+# Clean imports using proper package structure
+from fortunamind_persistent_mcp.core.base import WriteEnabledTool, ToolExecutionContext, ToolSchema, AuthContext, ToolCategory, Permission
+from fortunamind_persistent_mcp.core.security.scanner import SecurityScanner
+from fortunamind_persistent_mcp.persistent_mcp.storage.interface import StorageInterface, DataType
+from fortunamind_persistent_mcp.config import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -58,48 +53,7 @@ class JournalInsight:
     confidence: str
 
 
-class SecurityScanner:
-    """Security scanner for detecting sensitive information"""
-    
-    # Patterns that should never be stored
-    DANGEROUS_PATTERNS = [
-        # Coinbase API keys and secrets
-        (r'organizations/[a-f0-9\-]+/apiKeys/[a-f0-9\-]+', 'Coinbase API Key'),
-        (r'-----BEGIN EC PRIVATE KEY-----.*?-----END EC PRIVATE KEY-----', 'API Secret Key'),
-        (r'-----BEGIN PRIVATE KEY-----.*?-----END PRIVATE KEY-----', 'Private Key'),
-        
-        # Other API keys
-        (r'[A-Za-z0-9]{32,}', 'Potential API Key'),
-        
-        # Crypto private keys and seeds
-        (r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b', 'Bitcoin Address'),
-        (r'\b0x[a-fA-F0-9]{40}\b', 'Ethereum Address'),
-        (r'\b[A-Za-z0-9]{64}\b', 'Potential Private Key'),
-        
-        # Prompt injection attempts
-        (r'ignore.{0,10}previous.{0,10}instructions?', 'Prompt Injection'),
-        (r'system.{0,5}prompt', 'Prompt Injection'),
-        (r'you.{0,5}are.{0,5}now', 'Prompt Injection'),
-        (r'<\s*system\s*>', 'Prompt Injection'),
-        (r'assistant.{0,10}mode', 'Prompt Injection'),
-    ]
-    
-    @classmethod
-    def scan_content(cls, content: str) -> List[Dict[str, str]]:
-        """Scan content for dangerous patterns"""
-        issues = []
-        
-        for pattern, description in cls.DANGEROUS_PATTERNS:
-            matches = re.findall(pattern, content, re.IGNORECASE | re.DOTALL)
-            if matches:
-                issues.append({
-                    "type": "security_violation",
-                    "description": description,
-                    "pattern": pattern,
-                    "matches": len(matches)
-                })
-        
-        return issues
+# SecurityScanner removed - now using shared SecurityScanner from core.security
 
 
 class TradingJournalTool(WriteEnabledTool):
@@ -118,7 +72,7 @@ class TradingJournalTool(WriteEnabledTool):
     - Security scanning to prevent accidental credential storage
     """
     
-    def __init__(self, storage: StorageBackend, settings: Settings):
+    def __init__(self, storage: StorageInterface, settings: Settings):
         """
         Initialize trading journal tool
         
@@ -129,6 +83,7 @@ class TradingJournalTool(WriteEnabledTool):
         super().__init__()
         self.storage = storage
         self.settings = settings
+        self.security_scanner = SecurityScanner()
         
         logger.info("Trading journal tool initialized")
     
@@ -166,8 +121,8 @@ Just describe your investment decision in natural language - like talking to a f
 • **review**: Analyze journal patterns and get insights
 
 Choose 'review' to see patterns in your previous entries and get personalized learning insights.""",
-            category="portfolio_management",
-            permissions=["read_only", "write"],
+            category=ToolCategory.PORTFOLIO,
+            permissions=[Permission.READ_ONLY, Permission.WRITE],
             parameters={
                 "type": "object",
                 "properties": {
@@ -231,28 +186,25 @@ Choose 'review' to see patterns in your previous entries and get personalized le
             }
         )
     
-    async def _execute_impl(self, auth_context: Optional[AuthContext], **parameters) -> Any:
+    async def _execute_impl(self, context: ToolExecutionContext) -> Any:
         """Execute trading journal operation"""
-        action = parameters.get("action")
+        action = context.parameters.get("action")
         
         logger.info(f"Trading journal action: {action}")
         
-        if not auth_context:
-            return {
-                "error": "Authentication required for journal operations",
-                "educational_note": "Your journal is private and requires authentication to ensure your entries remain secure."
-            }
+        # Require authentication for all journal operations
+        auth_context = self._require_auth(context.auth_context)
         
         try:
             # Route to appropriate handler
             if action == "add_entry":
-                return await self._add_journal_entry(auth_context, parameters)
+                return await self._add_journal_entry(auth_context, context.parameters)
             elif action == "review_entries":
-                return await self._review_entries(auth_context, parameters)
+                return await self._review_entries(auth_context, context.parameters)
             elif action == "get_insights":
-                return await self._get_insights(auth_context, parameters)
+                return await self._get_insights(auth_context, context.parameters)
             elif action == "search_entries":
-                return await self._search_entries(auth_context, parameters)
+                return await self._search_entries(auth_context, context.parameters)
             else:
                 return {
                     "error": f"Unknown action: {action}",
@@ -282,16 +234,22 @@ Choose 'review' to see patterns in your previous entries and get personalized le
                 "error": "Content is required - describe your decision, thoughts, or analysis"
             }
         
-        # Security scan
-        security_issues = SecurityScanner.scan_content(content)
-        if security_issues:
-            logger.warning(f"Security scan failed for user {auth_context.user_id_hash[:8]}...")
-            return {
-                "error": "Security scan detected sensitive information",
-                "details": "Your entry contains what appears to be API keys, private keys, or other sensitive data that should not be stored in a journal.",
-                "blocked_patterns": [issue["description"] for issue in security_issues],
-                "educational_note": "Never store API keys, passwords, or private keys in your trading journal. This protects your accounts from security breaches."
-            }
+        # Security scan - additional content-specific scan since this is user-generated content
+        if self._security_scanner:
+            security_threats = self._security_scanner.scan_content(content, context="journal_entry")
+            high_risk_threats = [
+                threat for threat in security_threats
+                if threat.confidence > 0.8 and threat.level.value in ['critical', 'high']
+            ]
+            
+            if high_risk_threats:
+                logger.warning(f"Security scan failed for user {auth_context.user_id_hash[:8]}...")
+                return {
+                    "error": "Security scan detected sensitive information",
+                    "details": "Your entry contains what appears to be API keys, private keys, or other sensitive data that should not be stored in a journal.",
+                    "blocked_patterns": [threat.description for threat in high_risk_threats],
+                    "educational_note": "Never store API keys, passwords, or private keys in your trading journal. This protects your accounts from security breaches."
+                }
         
         # Validate content length
         if len(content) > self.settings.max_journal_entry_length:

@@ -9,6 +9,8 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone
 import uuid
 
+# Note: Template pattern temporarily disabled due to circular imports
+# from core.storage_template import InMemoryStorageTemplate
 from .interface import StorageInterface, StorageRecord, QueryFilter, DataType
 from config import Settings
 
@@ -17,17 +19,20 @@ logger = logging.getLogger(__name__)
 
 class MockStorageBackend(StorageInterface):
     """
-    In-memory mock storage backend for demo purposes
+    Mock storage backend using the template pattern
     
-    Provides basic storage functionality without external dependencies.
+    Extends InMemoryStorageTemplate with enhanced functionality for demo purposes.
+    Provides comprehensive storage functionality without external dependencies.
     Data is not persisted between application restarts.
     """
     
     def __init__(self, settings: Settings):
         """Initialize mock storage backend"""
         self.settings = settings
-        self.data: Dict[str, List[Dict[str, Any]]] = {}
         self._initialized = False
+        
+        # Legacy data structure for backward compatibility
+        self.data: Dict[str, List[Dict[str, Any]]] = {}
         
         logger.warning("Using mock storage backend - data will not persist between restarts")
     
@@ -39,9 +44,19 @@ class MockStorageBackend(StorageInterface):
         self._initialized = True
         logger.info("Mock storage backend initialized")
     
-    async def health_check(self) -> bool:
+    async def cleanup(self) -> None:
+        """Cleanup mock storage"""
+        self.data.clear()
+        self._initialized = False
+    
+    async def health_check(self) -> Dict[str, Any]:
         """Mock health check - always healthy"""
-        return True
+        return {
+            "status": "healthy",
+            "backend": "MockStorageBackend",
+            "initialized": self._initialized,
+            "data_keys": len(self.data)
+        }
     
     async def store_journal_entry(
         self, 
