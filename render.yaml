@@ -9,7 +9,8 @@ services:
   - name: fortunamind-persistent-mcp
     type: web
     runtime: docker
-    dockerfilePath: Dockerfile.render
+    dockerfilePath: ./Dockerfile.render
+    dockerContext: .
     region: oregon  # US West (Oregon) - adjust based on your location
     branch: main
     buildCommand: ""  # Docker build handled automatically
