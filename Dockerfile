@@ -34,8 +34,8 @@ RUN pip install --upgrade pip && \
 # Copy application source code
 COPY src/ ./src/
 
-# Copy configuration files
-COPY pyproject.toml setup.py ./
+# Copy configuration files and README
+COPY pyproject.toml setup.py README.md ./
 
 # Install the package itself for proper imports
 RUN pip install -e .
