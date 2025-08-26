@@ -32,5 +32,4 @@ python-dotenv>=1.0.0
 structlog>=23.2.0
 rich>=13.7.0
 
-# Technical Analysis
-talib-binary>=0.4.26
+# Technical Analysis (custom implementations - no external TA-Lib required)
