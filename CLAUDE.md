@@ -11,6 +11,65 @@ This file provides **mandatory guidance** to Claude Code (claude.ai/code) when w
 
 This project is built upon the **FortunaMind Tool Framework** and **Unified MCP Server Architecture** from the main coinbase-mcp repository. Understanding these foundational components is **mandatory** for effective development.
 
+## 🚨 **CRITICAL: FRAMEWORK SUBMODULE PROTECTION RULES**
+
+### **ABSOLUTE PROHIBITION - NO FRAMEWORK MODIFICATIONS**
+
+The `framework/` directory (once added as a git submodule) contains the FortunaMind Tool Framework from the parent `fortunamind-mcp` repository. This code is used by beta testers and MUST remain completely untouched.
+
+#### **MANDATORY RULES - NO EXCEPTIONS**
+
+1. **NEVER modify ANY file** within the `framework/` directory or submodule
+2. **NEVER use Edit, Write, or MultiEdit tools** on any path starting with `framework/`
+3. **NEVER commit changes** to files in the framework submodule
+4. **NEVER run format, lint, or refactor commands** that affect framework files
+5. **NEVER attempt to fix bugs or improve code** within the framework directory
+6. **READ-ONLY access only** - you may use Read, Grep, Glob, and LS tools to understand the framework
+
+#### **WHY THIS MATTERS**
+
+- The framework code is shared with production beta testers via `fortunamind-mcp`
+- Any modifications would break the beta testing experience
+- The submodule ensures we use the exact same code without duplication
+- This is a hard architectural boundary that MUST be respected
+
+#### **WHAT YOU CAN DO**
+
+✅ **READ** framework code to understand interfaces and contracts
+✅ **IMPORT** from framework modules in your own code
+✅ **EXTEND** framework classes in the `src/fortunamind_persistent_mcp/` directory
+✅ **MOCK** framework functionality when it's not available
+✅ **DOCUMENT** how to use framework components
+
+#### **WHAT YOU CANNOT DO**
+
+❌ **EDIT** any file in `framework/` directory
+❌ **CREATE** new files in the framework directory
+❌ **DELETE** framework files
+❌ **REFACTOR** framework code, even if you see issues
+❌ **FIX** bugs in framework code (report them instead)
+
+#### **ENFORCEMENT**
+
+If asked to modify framework code, you MUST:
+1. **REFUSE** the request politely
+2. **EXPLAIN** that framework modifications are prohibited
+3. **SUGGEST** creating an extension or override in the project's own code
+4. **OFFER** to report the issue for fixing in the parent repository
+
+### **Example Response When Asked to Modify Framework**
+
+> "I cannot modify files in the framework/ directory as it's a read-only submodule containing the shared FortunaMind Tool Framework. This code is used by beta testers and must remain unchanged. 
+> 
+> Instead, I can:
+> - Create an extended version in our project that inherits from the framework class
+> - Add a wrapper that modifies the behavior
+> - Implement a mock version for our specific needs
+> 
+> Which approach would you prefer?"
+
+---
+
 ## 🏗️ **FORTUNAMIND TOOL FRAMEWORK ARCHITECTURE**
 
 ### **Core Philosophy**
@@ -528,6 +587,13 @@ alembic>=1.8.0           # Database migrations
    - Multi-user environments with shared analytics
 
 ## ⚠️ **MANDATORY DEVELOPMENT GUIDELINES**
+
+### **🔒 Framework Submodule Protection**
+
+1. **Framework is READ-ONLY** - Never modify `framework/` directory contents
+2. **Use Extension Pattern** - Extend framework classes, don't modify them
+3. **Report Don't Fix** - Report framework issues, don't fix them locally
+4. **Submodule Updates** - Only update submodule commit hash when explicitly requested
 
 ### **🚨 Code Reuse Requirements**
 
