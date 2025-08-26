@@ -22,7 +22,7 @@ except ImportError:
 
 from ..storage import StorageBackend
 from ..auth import SubscriberAuth
-from ...config import Settings
+from config import Settings
 
 logger = logging.getLogger(__name__)
 

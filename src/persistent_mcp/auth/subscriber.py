@@ -25,7 +25,7 @@ except ImportError:
     from ...core.mock import AuthContext
     FRAMEWORK_AVAILABLE = False
 
-from ...config import Settings
+from config import Settings
 
 logger = logging.getLogger(__name__)
 

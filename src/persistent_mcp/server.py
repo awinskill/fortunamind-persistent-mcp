@@ -39,7 +39,7 @@ except ImportError:
     
     FRAMEWORK_AVAILABLE = False
 
-from ..config import Settings
+from config import Settings
 from .adapters import MCPStdioAdapter, MCPHttpAdapter
 from .storage import StorageBackend
 from .auth import SubscriberAuth

@@ -20,7 +20,7 @@ except ImportError:
     FRAMEWORK_AVAILABLE = False
 
 from ..storage import StorageBackend
-from ...config import Settings
+from config import Settings
 
 logger = logging.getLogger(__name__)
 
