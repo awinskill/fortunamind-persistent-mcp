@@ -17,17 +17,16 @@ logger = logging.getLogger(__name__)
 FRAMEWORK_AVAILABLE = False
 
 try:
-    # Try to access framework proxy to see if it works
-    from fortunamind_persistent_mcp.framework_proxy import get_framework
-    framework = get_framework()
-    if framework.framework_path.exists():
-        # Framework is accessible, we'll load components at runtime
-        logger.info(f"Framework detected at: {framework.framework_path}")
+    # Try to access framework submodule to see if it works
+    import framework.src.unified_tools
+    # Check if the key tools are available
+    if hasattr(framework.src.unified_tools, 'UnifiedPortfolioTool'):
+        logger.info("Framework submodule detected and available")
         FRAMEWORK_AVAILABLE = True
     else:
-        logger.warning("Framework path not found")
-except Exception as e:
-    logger.warning(f"Framework proxy not available: {e}")
+        logger.warning("Framework submodule exists but tools not found")
+except ImportError as e:
+    logger.warning(f"Framework submodule not available: {e}")
 
 # Clean imports using proper package structure
 from fortunamind_persistent_mcp.core.mock import ToolRegistry, AuthContext, ToolResult

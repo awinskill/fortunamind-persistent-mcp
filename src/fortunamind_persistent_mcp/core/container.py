@@ -132,15 +132,9 @@ class DIContainer:
         
         # Register tool registry
         try:
-            # Try to use framework proxy to get ToolRegistry
-            from framework_proxy import core_interfaces
-            framework_core = core_interfaces()
-            
-            if hasattr(framework_core, 'ToolRegistry'):
-                ToolRegistry = framework_core.ToolRegistry
-                logger.info("Using framework ToolRegistry")
-            else:
-                raise ImportError("ToolRegistry not found in framework")
+            # Try to use framework submodule to get ToolRegistry
+            from framework.src.core.interfaces import ToolRegistry
+            logger.info("Using framework ToolRegistry")
                 
         except ImportError:
             # Fallback to mock registry

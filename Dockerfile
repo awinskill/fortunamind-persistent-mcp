@@ -31,8 +31,9 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy application source code
+# Copy application source code and framework submodule
 COPY src/ ./src/
+COPY framework/ ./framework/
 
 # Copy configuration files and README
 COPY pyproject.toml setup.py README.md ./
@@ -47,8 +48,8 @@ RUN mkdir -p /app/logs && \
 # Switch to non-root user
 USER mcpuser
 
-# Set PYTHONPATH
-ENV PYTHONPATH=/app
+# Set PYTHONPATH to include framework submodule
+ENV PYTHONPATH=/app:/app/framework/src
 
 # Comprehensive health check using PORT environment variable support
 HEALTHCHECK --interval=30s --timeout=15s --start-period=90s --retries=3 \

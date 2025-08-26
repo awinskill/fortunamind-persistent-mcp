@@ -67,14 +67,12 @@ class FrameworkToolFactory(ToolFactoryInterface):
         self.framework_available = self._check_framework_availability()
     
     def _check_framework_availability(self) -> bool:
-        """Check if framework proxy is working"""
+        """Check if framework submodule is available"""
         try:
-            from fortunamind_persistent_mcp.framework_proxy import get_framework, unified_tools
-            
-            framework = get_framework()
-            tools_module = unified_tools()
-            return framework.framework_path.exists() and tools_module is not None
-        except Exception:
+            import framework.src.unified_tools
+            # Check if the key tools are available
+            return hasattr(framework.src.unified_tools, 'UnifiedPortfolioTool')
+        except ImportError:
             return False
     
     def can_create(self, tool_type: ToolType, implementation: ToolImplementation) -> bool:
@@ -96,17 +94,19 @@ class FrameworkToolFactory(ToolFactoryInterface):
             raise ToolCreationError(f"Cannot create framework tool: {tool_type}")
         
         try:
-            from fortunamind_persistent_mcp.framework_proxy import unified_tools
-            framework_tools_module = unified_tools()
+            from framework.src.unified_tools import (
+                UnifiedPortfolioTool,
+                UnifiedPricesTool, 
+                UnifiedMarketResearchTool
+            )
             
             tool_class_map = {
-                ToolType.PORTFOLIO: "UnifiedPortfolioTool",
-                ToolType.PRICES: "UnifiedPricesTool",
-                ToolType.MARKET_RESEARCH: "UnifiedMarketResearchTool",
+                ToolType.PORTFOLIO: UnifiedPortfolioTool,
+                ToolType.PRICES: UnifiedPricesTool,
+                ToolType.MARKET_RESEARCH: UnifiedMarketResearchTool,
             }
             
-            tool_class_name = tool_class_map[tool_type]
-            tool_class = getattr(framework_tools_module, tool_class_name)
+            tool_class = tool_class_map[tool_type]
             return tool_class()
             
         except Exception as e:

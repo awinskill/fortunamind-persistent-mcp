@@ -25,14 +25,10 @@ class PersistentPortfolioTool(ReadOnlyTool):
         
         # Try to import framework tool
         try:
-            from fortunamind_persistent_mcp.framework_proxy import unified_tools
-            framework_tools = unified_tools()
-            if hasattr(framework_tools, 'UnifiedPortfolioTool'):
-                self.framework_tool = framework_tools.UnifiedPortfolioTool()
-                logger.info("Using framework UnifiedPortfolioTool")
-            else:
-                raise ImportError("UnifiedPortfolioTool not available")
-        except Exception as e:
+            from framework.src.unified_tools import UnifiedPortfolioTool
+            self.framework_tool = UnifiedPortfolioTool()
+            logger.info("Using framework UnifiedPortfolioTool")
+        except ImportError as e:
             logger.warning(f"Framework tool not available: {e}")
             # Fall back to mock implementation
             self.framework_tool = None

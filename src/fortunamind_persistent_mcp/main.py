@@ -14,12 +14,12 @@ from pathlib import Path
 # Path imports no longer needed with proper package structure
 
 try:
-    # Import framework proxy but don't call it at import time
-    from fortunamind_persistent_mcp.framework_proxy import get_framework, unified_tools, core_interfaces
+    # Direct import from framework submodule
+    import framework.src.unified_tools
     FRAMEWORK_AVAILABLE = True
-    print("✅ Framework proxy available")
-except Exception as e:
-    print(f"⚠️ Framework proxy not available: {e}")
+    print("✅ Framework submodule available")
+except ImportError as e:
+    print(f"⚠️ Framework submodule not available: {e}")
     print("This is expected during initial development setup.")
     FRAMEWORK_AVAILABLE = False
 
