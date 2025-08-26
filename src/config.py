@@ -85,10 +85,10 @@ class Settings(BaseSettings):
     )
     
     server_port: int = Field(
-        default=8080,
+        default_factory=lambda: int(os.environ.get("PORT", "8080")),
         ge=1,
         le=65535,
-        description="Server bind port"
+        description="Server bind port (reads from PORT env var for Render)"
     )
     
     environment: Environment = Field(
