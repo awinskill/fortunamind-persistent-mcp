@@ -13,11 +13,11 @@ from typing import Dict, List, Optional, Any, TextIO
 from datetime import datetime
 
 try:
-    from framework.core.registry import ToolRegistry
-    from framework.core.interfaces import AuthContext, ToolResult, ToolSchema
+    from framework.src.core.registry import ToolRegistry
+    from framework.src.core.interfaces import AuthContext, ToolResult, ToolSchema
     FRAMEWORK_AVAILABLE = True
 except ImportError:
-    from core.mock import ToolRegistry, AuthContext, ToolResult, ToolSchema
+    from ...core.mock import ToolRegistry, AuthContext, ToolResult, ToolSchema
     FRAMEWORK_AVAILABLE = False
 
 from ..storage import StorageBackend

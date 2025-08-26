@@ -14,11 +14,11 @@ from dataclasses import dataclass
 from enum import Enum
 
 try:
-    from framework.core.interfaces import AuthContext, ToolResult, ToolSchema
-    from framework.core.base import ReadOnlyTool as FrameworkReadOnlyTool, WriteEnabledTool as FrameworkWriteEnabledTool
+    from framework.src.core.interfaces import AuthContext, ToolResult, ToolSchema
+    from framework.src.core.base import ReadOnlyTool as FrameworkReadOnlyTool, WriteEnabledTool as FrameworkWriteEnabledTool
     FRAMEWORK_AVAILABLE = True
 except ImportError:
-    from core.mock import AuthContext, ToolResult, ToolSchema, ReadOnlyTool as FrameworkReadOnlyTool, WriteEnabledTool as FrameworkWriteEnabledTool
+    from .mock import AuthContext, ToolResult, ToolSchema, ReadOnlyTool as FrameworkReadOnlyTool, WriteEnabledTool as FrameworkWriteEnabledTool
     FRAMEWORK_AVAILABLE = False
 
 from config import Settings

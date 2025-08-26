@@ -15,7 +15,7 @@ ENV PYTHONUNBUFFERED=1 \
 RUN groupadd --gid 1000 mcpuser && \
     useradd --uid 1000 --gid mcpuser --shell /bin/bash --create-home mcpuser
 
-# Install system dependencies including git for version generation
+# Install system dependencies including git for submodule initialization
 RUN apt-get update && apt-get install -y \
     curl \
     ca-certificates \
@@ -31,9 +31,13 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy application source code and framework submodule
+# Copy git configuration and application source code
+COPY .git/ ./.git/
+COPY .gitmodules ./
 COPY src/ ./src/
-COPY framework/ ./framework/
+
+# Initialize and update git submodules
+RUN git submodule update --init --recursive
 
 # Copy configuration files and README
 COPY pyproject.toml setup.py README.md ./

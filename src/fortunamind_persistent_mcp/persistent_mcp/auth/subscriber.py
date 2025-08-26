@@ -19,10 +19,10 @@ except ImportError:
     AIOHTTP_AVAILABLE = False
 
 try:
-    from framework.core.interfaces import AuthContext
+    from framework.src.core.interfaces import AuthContext
     FRAMEWORK_AVAILABLE = True
 except ImportError:
-    from core.mock import AuthContext
+    from ...core.mock import AuthContext
     FRAMEWORK_AVAILABLE = False
 
 from config import Settings
