@@ -11,12 +11,8 @@ import os
 import sys
 from pathlib import Path
 
-# Add src directory to Python path
-src_dir = Path(__file__).parent
-sys.path.insert(0, str(src_dir))
-
-from config import get_settings
-from persistent_mcp.server import PersistentMCPServer
+from fortunamind_persistent_mcp.config import get_settings
+from fortunamind_persistent_mcp.persistent_mcp.server import PersistentMCPServer
 
 
 def print_http_banner():

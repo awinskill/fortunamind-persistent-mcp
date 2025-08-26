@@ -35,7 +35,10 @@ RUN pip install --upgrade pip && \
 COPY src/ ./src/
 
 # Copy configuration files
-COPY pyproject.toml ./
+COPY pyproject.toml setup.py ./
+
+# Install the package itself for proper imports
+RUN pip install -e .
 
 # Create logs directory and set proper permissions
 RUN mkdir -p /app/logs && \
@@ -56,4 +59,4 @@ EXPOSE 8080
 
 # Production command optimized for Render
 # Use the direct HTTP server startup script
-CMD python src/http_server.py
+CMD python -m fortunamind_persistent_mcp.http_server
