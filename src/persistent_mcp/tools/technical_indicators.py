@@ -16,7 +16,7 @@ try:
     from framework.unified_tools import UnifiedPricesTool
     FRAMEWORK_AVAILABLE = True
 except ImportError:
-    from ...core.mock import AuthContext, ToolResult, ToolSchema, ReadOnlyTool, UnifiedPricesTool
+    from core.mock import AuthContext, ToolResult, ToolSchema, ReadOnlyTool, UnifiedPricesTool
     FRAMEWORK_AVAILABLE = False
 
 from ..storage import StorageBackend

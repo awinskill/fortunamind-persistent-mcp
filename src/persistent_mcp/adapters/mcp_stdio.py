@@ -17,7 +17,7 @@ try:
     from framework.core.interfaces import AuthContext, ToolResult, ToolSchema
     FRAMEWORK_AVAILABLE = True
 except ImportError:
-    from ...core.mock import ToolRegistry, AuthContext, ToolResult, ToolSchema
+    from core.mock import ToolRegistry, AuthContext, ToolResult, ToolSchema
     FRAMEWORK_AVAILABLE = False
 
 from ..storage import StorageBackend

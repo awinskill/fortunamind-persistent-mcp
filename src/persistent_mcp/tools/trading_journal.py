@@ -18,7 +18,7 @@ try:
     from framework.core.base import ReadOnlyTool, WriteEnabledTool
     FRAMEWORK_AVAILABLE = True
 except ImportError:
-    from ...core.mock import AuthContext, ToolResult, ToolSchema, ReadOnlyTool, WriteEnabledTool
+    from core.mock import AuthContext, ToolResult, ToolSchema, ReadOnlyTool, WriteEnabledTool
     FRAMEWORK_AVAILABLE = False
 
 from ..storage import StorageBackend
