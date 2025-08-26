@@ -85,10 +85,18 @@ class PersistentMCPServer:
         
         # Initialize storage backend
         if self.storage is None:
-            from .storage import SupabaseStorageBackend
-            self.storage = SupabaseStorageBackend(self.settings)
-            await self.storage.initialize()
-            logger.info("✅ Storage backend initialized")
+            try:
+                from .storage import SupabaseStorageBackend
+                self.storage = SupabaseStorageBackend(self.settings)
+                await self.storage.initialize()
+                logger.info("✅ Storage backend initialized")
+            except Exception as e:
+                logger.warning(f"Supabase storage initialization failed: {e}")
+                logger.info("🔄 Falling back to mock storage for demo mode")
+                from .storage import MockStorageBackend
+                self.storage = MockStorageBackend(self.settings)
+                await self.storage.initialize()
+                logger.info("✅ Mock storage backend initialized")
         
         # Initialize authentication
         if self.auth is None:
