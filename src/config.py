@@ -49,22 +49,22 @@ class Settings(BaseSettings):
     
     # ===== DATABASE CONFIGURATION =====
     database_url: str = Field(
-        ...,
+        default="postgresql://mock:mock@mock:5432/mock",
         description="PostgreSQL database connection URL"
     )
     
     supabase_url: str = Field(
-        ...,
+        default="https://mock.supabase.co",
         description="Supabase project URL"
     )
     
     supabase_anon_key: str = Field(
-        ...,
+        default="mock-anon-key-replace-in-dashboard",
         description="Supabase anonymous key"
     )
     
     supabase_service_role_key: str = Field(
-        ...,
+        default="mock-service-key-replace-in-dashboard",
         description="Supabase service role key"
     )
     
@@ -98,7 +98,7 @@ class Settings(BaseSettings):
     
     # ===== SECURITY CONFIGURATION =====
     jwt_secret_key: str = Field(
-        ...,
+        default="mock-jwt-secret-key-at-least-32-chars-long-for-production-use",
         min_length=32,
         description="JWT signing secret key"
     )
