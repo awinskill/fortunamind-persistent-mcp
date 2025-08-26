@@ -31,13 +31,9 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy git configuration and application source code
-COPY .git/ ./.git/
-COPY .gitmodules ./
+# Copy application source code and framework submodule content
 COPY src/ ./src/
-
-# Initialize and update git submodules
-RUN git submodule update --init --recursive
+COPY framework/ ./framework/
 
 # Copy configuration files and README
 COPY pyproject.toml setup.py README.md ./
