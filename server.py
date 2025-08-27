@@ -30,7 +30,7 @@ print(f"Current Python path: {sys.path[:3]}...")  # Show first 3 entries
 
 # FastAPI and MCP imports
 from fastapi import FastAPI, HTTPException, Request, Header, Depends
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
@@ -191,6 +191,58 @@ async def detailed_status(adapter: FrameworkPersistenceAdapter = Depends(get_ada
     except Exception as e:
         logger.error(f"Status check failed: {e}")
         raise HTTPException(status_code=500, detail=f"Status check failed: {str(e)}")
+
+
+@app.get("/static/mcp_http_bridge.py")
+async def serve_http_bridge():
+    """Serve the HTTP bridge Python file for one-command installation"""
+    try:
+        bridge_path = os.path.join(os.path.dirname(__file__), 'static', 'mcp_http_bridge.py')
+        
+        if not os.path.exists(bridge_path):
+            raise HTTPException(status_code=404, detail="HTTP bridge file not found")
+        
+        with open(bridge_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        return Response(
+            content=content,
+            media_type="text/x-python",
+            headers={
+                "Content-Disposition": "attachment; filename=mcp_http_bridge.py",
+                "Cache-Control": "public, max-age=3600"  # Cache for 1 hour
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to serve HTTP bridge: {e}")
+        raise HTTPException(status_code=500, detail="Failed to serve bridge file")
+
+
+@app.get("/install")
+async def serve_install_script():
+    """Serve the one-command installer script"""
+    try:
+        install_path = os.path.join(os.path.dirname(__file__), 'install-fortunamind-persistent.sh')
+        
+        if not os.path.exists(install_path):
+            raise HTTPException(status_code=404, detail="Install script not found")
+        
+        with open(install_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        return Response(
+            content=content,
+            media_type="application/x-sh",
+            headers={
+                "Content-Type": "text/x-shellscript",
+                "Cache-Control": "public, max-age=1800"  # Cache for 30 minutes
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to serve install script: {e}")
+        raise HTTPException(status_code=500, detail="Failed to serve install script")
 
 
 @app.post("/store_journal_entry")

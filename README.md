@@ -39,7 +39,33 @@ Built on the proven FortunaMind Tool Framework:
 - **Storage:** PostgreSQL on Supabase with Row Level Security
 - **Security:** Integrated common security scanner
 
-## 📋 **Quick Start**
+## 🚀 **Easy Install (5 Minutes)**
+
+### For End Users - One Command Setup
+
+Get started immediately with our automated installer:
+
+```bash
+curl -fsSL https://fortunamind-persistent-mcp.onrender.com/install | bash
+```
+
+**What you need:**
+- Python 3.8+ installed
+- FortunaMind subscription credentials (email + key)
+- Coinbase Advanced Trading API credentials
+
+**What it does:**
+- ✅ Creates isolated Python environment
+- ✅ Downloads HTTP bridge (~10KB)
+- ✅ Configures Claude Desktop automatically
+- ✅ Handles both subscription and Coinbase credentials
+- ✅ Verifies everything works
+
+📖 **[Complete Install Guide →](EASY_INSTALL.md)**
+
+---
+
+## 📋 **Development Setup**
 
 ### Prerequisites
 - Active FortunaMind subscription
@@ -47,7 +73,7 @@ Built on the proven FortunaMind Tool Framework:
 - Access to Supabase database
 - Coinbase Advanced Trading API credentials (provided per session)
 
-### Development Setup
+### Development Environment
 ```bash
 # Clone repository
 git clone https://github.com/awinskill/fortunamind-persistent-mcp.git
