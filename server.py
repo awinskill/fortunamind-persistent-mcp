@@ -164,6 +164,25 @@ async def startup_event():
         raise
 
 
+@app.get("/")
+async def root():
+    """Root endpoint with server information"""
+    return {
+        "server": "FortunaMind Persistent MCP Server",
+        "version": "1.0",
+        "status": "running",
+        "endpoints": {
+            "health": "/health",
+            "status": "/status", 
+            "mcp": "/mcp",
+            "install": "/install",
+            "bridge": "/static/mcp_http_bridge.py"
+        },
+        "documentation": "https://github.com/awinskill/fortunamind-persistent-mcp",
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
 @app.get("/health")
 async def health_check():
     """Basic health check endpoint"""
