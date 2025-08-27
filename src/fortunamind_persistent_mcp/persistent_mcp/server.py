@@ -34,9 +34,9 @@ from fortunamind_persistent_mcp.config import Settings
 from .adapters import MCPStdioAdapter, MCPHttpAdapter
 
 # Import new persistence library components
-from ..fortunamind_persistence.storage.interfaces import PersistentStorageInterface
-from ..fortunamind_persistence.storage.supabase_backend import SupabaseStorage
-from ..fortunamind_persistence.storage.mock_backend import MockStorage
+from fortunamind_persistence.storage.interfaces import PersistentStorageInterface
+from fortunamind_persistence.storage.supabase_backend import SupabaseStorage
+from fortunamind_persistence.storage.mock_backend import MockStorage
 
 from .tools.technical_indicators import TechnicalIndicatorsTool
 from .tools.trading_journal import TradingJournalTool

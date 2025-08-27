@@ -21,13 +21,11 @@ except ImportError:
     FRAMEWORK_AVAILABLE = False
 
 # Import new persistence library
-from ...fortunamind_persistence import (
-    EmailIdentity,
-    SubscriptionValidator,
-    FrameworkPersistenceAdapter
-)
-from ...fortunamind_persistence.storage.interfaces import PersistentStorageInterface
-from ...fortunamind_persistence.rate_limiting import RateLimiter
+from fortunamind_persistence.adapters import FrameworkPersistenceAdapter
+from fortunamind_persistence.identity import EmailIdentity
+from fortunamind_persistence.subscription import SubscriptionValidator
+from fortunamind_persistence.storage.interfaces import PersistentStorageInterface
+from fortunamind_persistence.rate_limiting import RateLimiter
 
 from fortunamind_persistent_mcp.config import Settings
 

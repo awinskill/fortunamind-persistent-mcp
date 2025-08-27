@@ -20,8 +20,13 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-# Add src to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+# Add src to Python path to ensure imports work
+src_path = os.path.join(os.path.dirname(__file__), 'src')
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
+    
+print(f"Added to Python path: {src_path}")
+print(f"Current Python path: {sys.path[:3]}...")  # Show first 3 entries
 
 # FastAPI and MCP imports
 from fastapi import FastAPI, HTTPException, Request, Header, Depends
