@@ -456,7 +456,7 @@ class FrameworkPersistenceAdapter:
             result = await self.validator.validate('test@example.com', 'fm_sub_invalid')
             health_status['components']['subscription_validator'] = {
                 'status': 'healthy',
-                'cache_size': len(self.validator.cache.cache) if hasattr(self.validator, 'cache') else 0
+                'cache_size': len(self.validator.cache._cache) if hasattr(self.validator, 'cache') else 0
             }
         except Exception as e:
             health_status['components']['subscription_validator'] = {

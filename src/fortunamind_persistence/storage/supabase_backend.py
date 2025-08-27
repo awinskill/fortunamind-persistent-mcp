@@ -122,9 +122,9 @@ class SupabaseStorage(PersistentStorageInterface):
             }
         
         try:
-            # Test with a simple query
+            # Test with a simple query on our actual table
             start_time = datetime.utcnow()
-            result = self.client.table('users').select('count').execute()
+            result = self.client.table('user_subscriptions').select('count').limit(1).execute()
             end_time = datetime.utcnow()
             
             return {
