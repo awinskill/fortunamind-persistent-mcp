@@ -20,8 +20,15 @@ except ImportError:
     from ...core.mock import ToolRegistry, AuthContext, ToolResult, ToolSchema
     FRAMEWORK_AVAILABLE = False
 
-from ..storage import StorageBackend
-from ..auth import SubscriberAuth
+# Import new persistence library
+from ...fortunamind_persistence import (
+    EmailIdentity,
+    SubscriptionValidator,
+    FrameworkPersistenceAdapter
+)
+from ...fortunamind_persistence.storage.interfaces import PersistentStorageInterface
+from ...fortunamind_persistence.rate_limiting import RateLimiter
+
 from fortunamind_persistent_mcp.config import Settings
 
 logger = logging.getLogger(__name__)
@@ -38,8 +45,7 @@ class MCPStdioAdapter:
     def __init__(
         self, 
         registry: ToolRegistry,
-        storage: StorageBackend,
-        auth: SubscriberAuth,
+        storage_backend: PersistentStorageInterface,
         settings: Settings,
         stdin: Optional[TextIO] = None,
         stdout: Optional[TextIO] = None
@@ -49,16 +55,25 @@ class MCPStdioAdapter:
         
         Args:
             registry: Tool registry containing available tools
-            storage: Storage backend for persistence
-            auth: Authentication system
+            storage_backend: Persistent storage implementation
             settings: Application settings
             stdin: Input stream (defaults to sys.stdin)
             stdout: Output stream (defaults to sys.stdout)
         """
         self.registry = registry
-        self.storage = storage
-        self.auth = auth
         self.settings = settings
+        
+        # Initialize persistence components
+        self.identity = EmailIdentity()
+        self.subscription_validator = SubscriptionValidator()
+        self.rate_limiter = RateLimiter()
+        
+        # Create framework adapter
+        self.persistence_adapter = FrameworkPersistenceAdapter(
+            subscription_validator=self.subscription_validator,
+            storage_backend=storage_backend,
+            rate_limiter=self.rate_limiter
+        )
         
         # I/O streams
         self.stdin = stdin or sys.stdin
@@ -77,6 +92,9 @@ class MCPStdioAdapter:
     async def initialize(self):
         """Initialize the adapter"""
         logger.info("Initializing MCP STDIO adapter...")
+        
+        # Initialize persistence components
+        await self.subscription_validator.initialize()
         
         # Setup I/O handling
         self._setup_stdio()
@@ -278,17 +296,10 @@ class MCPStdioAdapter:
             # Extract authentication context
             auth_context = await self._extract_auth_context(tool_arguments)
             
-            # Verify subscription if auth context provided
-            if auth_context and self.auth:
-                subscription_valid = await self.auth.verify_subscription(auth_context)
-                if not subscription_valid:
-                    return {
-                        "id": request_id,
-                        "error": {
-                            "code": "authentication_error",
-                            "message": "Valid subscription required"
-                        }
-                    }
+            # For new email-based authentication, validation is done in _extract_auth_context
+            # For legacy API key auth, we'll allow it but log a deprecation warning
+            if auth_context and auth_context.source == "mcp_stdio_legacy":
+                logger.warning("Using deprecated API key authentication. Please upgrade to email + subscription key authentication.")
             
             # Execute tool
             result = await self._execute_tool(tool_name, auth_context, tool_arguments)
@@ -344,27 +355,46 @@ class MCPStdioAdapter:
     
     async def _extract_auth_context(self, arguments: Dict[str, Any]) -> Optional[AuthContext]:
         """Extract authentication context from tool arguments"""
+        # Check for new authentication format (email + subscription key)
+        email = arguments.get("email")
+        subscription_key = arguments.get("subscription_key")
+        
+        if email and subscription_key:
+            try:
+                # Use the framework adapter to create auth context
+                coinbase_credentials = {
+                    'api_key': arguments.get("api_key"),
+                    'api_secret': arguments.get("api_secret")
+                }
+                auth_context = await self.persistence_adapter.create_auth_context_from_credentials(
+                    email=email,
+                    subscription_key=subscription_key,
+                    coinbase_credentials=coinbase_credentials if coinbase_credentials['api_key'] else None
+                )
+                return auth_context
+                
+            except ValueError as e:
+                logger.warning(f"Authentication failed: {e}")
+                return None
+        
+        # Fallback to legacy API key authentication
         api_key = arguments.get("api_key")
         api_secret = arguments.get("api_secret")
         
         if not api_key or not api_secret:
             return None
         
-        # Create auth context
+        # Create legacy auth context (for backward compatibility)
+        user_id = self.identity.generate_user_id_from_api_key(api_key)
         return AuthContext(
             api_key=api_key,
             api_secret=api_secret,
-            user_id_hash=self._generate_user_id_hash(api_key),
+            user_id_hash=user_id,
             timestamp=datetime.now().isoformat(),
-            source="mcp_stdio"
+            source="mcp_stdio_legacy"
         )
     
-    def _generate_user_id_hash(self, api_key: str) -> str:
-        """Generate consistent user ID hash from API key"""
-        import hashlib
-        # Use first part of API key for consistent hashing
-        key_part = api_key.split("/")[-1] if "/" in api_key else api_key
-        return hashlib.sha256(key_part.encode()).hexdigest()[:16]
+    # Removed _generate_user_id_hash - now using EmailIdentity.generate_user_id_from_api_key
     
     async def _execute_tool(
         self, 
@@ -424,6 +454,9 @@ class MCPStdioAdapter:
         """Cleanup adapter resources"""
         logger.info("Cleaning up MCP STDIO adapter...")
         self._running = False
+        
+        # Cleanup persistence components
+        await self.subscription_validator.cleanup()
         
         # Close streams if we own them
         if self.stdin != sys.stdin:

@@ -16,11 +16,12 @@ from unittest.mock import Mock, AsyncMock
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from config import Settings, Environment, SecurityProfile, LogLevel
-from core.container import DIContainer
-from core.security import SecurityScanner
-from persistent_mcp.storage import MockStorageBackend
-from persistent_mcp.auth import SubscriberAuth
+# Import from new persistence library
+from fortunamind_persistence.storage.mock_backend import MockStorage
+from fortunamind_persistence.subscription.validator import SubscriptionValidator
+from fortunamind_persistence.identity.email_identity import EmailIdentity
+from fortunamind_persistence.rate_limiting.limiter import RateLimiter
+from fortunamind_persistence.adapters.framework_adapter import FrameworkPersistenceAdapter
 
 
 @pytest.fixture(scope="session")
@@ -32,74 +33,29 @@ def event_loop() -> Generator:
 
 
 @pytest.fixture
-def test_settings() -> Settings:
-    """Create test settings with safe defaults"""
-    return Settings(
-        # Database settings (mock)
-        database_url="postgresql://test:test@test:5432/test",
-        supabase_url="https://test.supabase.co",
-        supabase_anon_key="test-anon-key",
-        supabase_service_role_key="test-service-role-key",
-        
-        # Server settings
-        mcp_server_name="Test-MCP-Server",
-        server_host="127.0.0.1",
-        server_port=8888,
-        server_mode="http",
-        environment=Environment.DEVELOPMENT,
-        
-        # Security settings
-        jwt_secret_key="test-secret-key-must-be-at-least-32-characters-long-for-validation",
-        jwt_algorithm="HS256",
-        security_profile=SecurityProfile.MODERATE,
-        
-        # Logging
-        log_level=LogLevel.DEBUG,
-        log_format="text",
-        log_file_path=None,
-        
-        # Feature flags
-        enable_trading_journal=True,
-        enable_technical_indicators=True,
-        enable_portfolio_integration=True,
-        enable_pre_trade_analysis=True,
-        enable_advanced_analytics=False,
-        enable_predictive_insights=False,
-        
-        # Rate limiting
-        api_rate_limit_per_minute=1000,
-        max_journal_entry_length=10000,
-        
-        # Mock settings
-        mock_subscription_check=True,
-        mock_technical_data=True,
-        
-        # Performance
-        db_pool_size=5,
-        db_max_overflow=10,
-        db_pool_timeout=10,
-        http_timeout_seconds=10,
-        http_retry_attempts=2,
-        cache_default_ttl_seconds=60
-    )
-
-
-@pytest.fixture
-async def test_container(test_settings: Settings) -> AsyncGenerator[DIContainer, None]:
-    """Create and initialize a test DI container"""
-    container = DIContainer(test_settings)
-    await container.initialize()
+def test_env_vars():
+    """Set up test environment variables"""
+    test_vars = {
+        'SUPABASE_URL': 'https://test.supabase.co',
+        'SUPABASE_ANON_KEY': 'test-anon-key',
+        'DATABASE_URL': 'postgresql://test:test@test:5432/test'
+    }
     
-    yield container
+    # Set test environment variables
+    for key, value in test_vars.items():
+        os.environ[key] = value
+    
+    yield test_vars
     
     # Cleanup
-    await container.shutdown()
+    for key in test_vars:
+        os.environ.pop(key, None)
 
 
 @pytest.fixture
-async def mock_storage(test_settings: Settings) -> AsyncGenerator[MockStorageBackend, None]:
+async def mock_storage(test_env_vars) -> AsyncGenerator[MockStorage, None]:
     """Create a mock storage backend for testing"""
-    storage = MockStorageBackend(test_settings)
+    storage = MockStorage()
     await storage.initialize()
     
     yield storage
@@ -110,16 +66,36 @@ async def mock_storage(test_settings: Settings) -> AsyncGenerator[MockStorageBac
 
 
 @pytest.fixture
-def mock_auth(test_settings: Settings) -> SubscriberAuth:
-    """Create a mock authentication system"""
-    auth = SubscriberAuth(test_settings)
+async def subscription_validator(test_env_vars) -> AsyncGenerator[SubscriptionValidator, None]:
+    """Create a subscription validator for testing"""
+    validator = SubscriptionValidator()
+    await validator.initialize()
     
-    # Mock the verification methods for testing
-    auth.verify_subscription = AsyncMock(return_value=True)
-    auth.get_user_id_hash = Mock(return_value="test-user-hash-123")
-    auth.health_check = AsyncMock(return_value={"status": "healthy"})
+    yield validator
     
-    return auth
+    await validator.cleanup()
+
+
+@pytest.fixture
+def email_identity() -> EmailIdentity:
+    """Create an email identity handler for testing"""
+    return EmailIdentity()
+
+
+@pytest.fixture
+def rate_limiter() -> RateLimiter:
+    """Create a rate limiter for testing"""
+    return RateLimiter()
+
+
+@pytest.fixture
+async def framework_adapter(mock_storage, subscription_validator, rate_limiter) -> FrameworkPersistenceAdapter:
+    """Create a complete framework adapter for testing"""
+    return FrameworkPersistenceAdapter(
+        subscription_validator=subscription_validator,
+        storage_backend=mock_storage,
+        rate_limiter=rate_limiter
+    )
 
 
 @pytest.fixture

@@ -8,10 +8,36 @@ services:
   # =============================================================================
   - name: fortunamind-persistent-mcp
     type: web
-    runtime: docker
+    runtime: python3
     region: oregon  # US West (Oregon) - adjust based on your location
     branch: main
-    buildCommand: ""  # Docker build handled automatically
+    buildCommand: |
+      echo "🔧 Installing dependencies..."
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      
+      echo "🗄️ Running database migrations..."
+      if [ ! -z "$DATABASE_URL" ]; then
+        alembic upgrade head
+        echo "✅ Database migrations completed"
+      else
+        echo "⚠️ DATABASE_URL not set, skipping migrations"
+      fi
+      
+      echo "🧪 Testing persistence library..."
+      python -c "
+import sys
+sys.path.insert(0, 'src')
+try:
+    from fortunamind_persistence.storage import SupabaseStorage
+    from fortunamind_persistence.subscription import SubscriptionValidator
+    from fortunamind_persistence.rate_limiting import RateLimiter
+    print('✅ Persistence library modules imported successfully')
+except Exception as e:
+    print(f'❌ Import error: {e}')
+    sys.exit(1)
+"
+    startCommand: python server.py
     plan: starter  # Start with $7/month, upgrade to 'standard' for production
 
     # Environment Configuration
@@ -62,19 +88,19 @@ services:
       - key: MAX_JOURNAL_ENTRY_LENGTH
         value: 2000
         
-      # Mock settings for demo deployment (override in Render dashboard for production)
-      - key: MOCK_SUBSCRIPTION_CHECK
-        value: true
-      - key: MOCK_TECHNICAL_DATA
-        value: true
+      # Production Persistence Configuration
+      # ⚠️ CRITICAL: These MUST be set as encrypted environment variables in Render Dashboard
+      # DO NOT set real values here - they will be visible in version control
       - key: DATABASE_URL
-        value: "postgresql://mock:mock@mock:5432/mock"
-      - key: SUPABASE_URL
-        value: "https://mock.supabase.co"
+        sync: false  # Set manually in Render dashboard with real Supabase connection string
+      - key: SUPABASE_URL  
+        sync: false  # Set manually in Render dashboard with real project URL
       - key: SUPABASE_ANON_KEY
-        value: "mock-anon-key-replace-in-dashboard"
+        sync: false  # Set manually in Render dashboard with real anon key
+        
+      # Optional: Advanced features (can be enabled in dashboard)
       - key: SUPABASE_SERVICE_ROLE_KEY
-        value: "mock-service-key-replace-in-dashboard"
+        sync: false  # Only needed for admin operations, set in dashboard if required
         
       # Render-specific Configuration
       - key: RENDER

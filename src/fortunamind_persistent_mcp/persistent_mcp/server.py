@@ -32,8 +32,12 @@ except ImportError as e:
 from fortunamind_persistent_mcp.core.mock import ToolRegistry, AuthContext, ToolResult
 from fortunamind_persistent_mcp.config import Settings
 from .adapters import MCPStdioAdapter, MCPHttpAdapter
-from .storage.interface import StorageInterface
-from .auth import SubscriberAuth
+
+# Import new persistence library components
+from ..fortunamind_persistence.storage.interfaces import PersistentStorageInterface
+from ..fortunamind_persistence.storage.supabase_backend import SupabaseStorage
+from ..fortunamind_persistence.storage.mock_backend import MockStorage
+
 from .tools.technical_indicators import TechnicalIndicatorsTool
 from .tools.trading_journal import TradingJournalTool
 from .tools.persistent_portfolio import PersistentPortfolioTool
@@ -59,8 +63,7 @@ class PersistentMCPServer:
         self.settings = settings
         self.server_mode = server_mode
         self.registry = ToolRegistry()
-        self.storage: Optional[StorageInterface] = None
-        self.auth: Optional[SubscriberAuth] = None
+        self.storage_backend: Optional[PersistentStorageInterface] = None
         self.adapter: Optional[Union[MCPStdioAdapter, MCPHttpAdapter]] = None
         
         # Server state
@@ -73,25 +76,20 @@ class PersistentMCPServer:
         """Initialize all server components"""
         logger.info("Initializing server components...")
         
-        # Initialize storage backend
-        if self.storage is None:
+        # Initialize storage backend using new persistence library
+        if self.storage_backend is None:
             try:
-                from .storage import SupabaseStorageBackend
-                self.storage = SupabaseStorageBackend(self.settings)
-                await self.storage.initialize()
-                logger.info("✅ Storage backend initialized")
+                # Try to use Supabase storage
+                self.storage_backend = SupabaseStorage()
+                await self.storage_backend.initialize()
+                logger.info("✅ Supabase storage backend initialized")
             except Exception as e:
                 logger.warning(f"Supabase storage initialization failed: {e}")
                 logger.info("🔄 Falling back to mock storage for demo mode")
-                from .storage import MockStorageBackend
-                self.storage = MockStorageBackend(self.settings)
-                await self.storage.initialize()
+                # Use mock storage for development/testing
+                self.storage_backend = MockStorage()
+                await self.storage_backend.initialize()
                 logger.info("✅ Mock storage backend initialized")
-        
-        # Initialize authentication
-        if self.auth is None:
-            self.auth = SubscriberAuth(self.settings)
-            logger.info("✅ Authentication system initialized")
         
         # Register tools
         await self._register_tools()
@@ -101,15 +99,13 @@ class PersistentMCPServer:
             if self.server_mode == "http":
                 self.adapter = MCPHttpAdapter(
                     registry=self.registry,
-                    storage=self.storage,
-                    auth=self.auth,
+                    storage_backend=self.storage_backend,
                     settings=self.settings
                 )
             else:  # Default to STDIO
                 self.adapter = MCPStdioAdapter(
                     registry=self.registry,
-                    storage=self.storage,
-                    auth=self.auth,
+                    storage_backend=self.storage_backend,
                     settings=self.settings
                 )
             
@@ -126,7 +122,7 @@ class PersistentMCPServer:
         from fortunamind_persistent_mcp.core.tool_factory import UnifiedToolFactory, ToolType, create_all_available_tools
         
         # Create factory with our storage and settings
-        factory = UnifiedToolFactory(storage=self.storage, settings=self.settings)
+        factory = UnifiedToolFactory(storage=self.storage_backend, settings=self.settings)
         
         # Show available implementations
         available_tools = factory.get_available_tools()
@@ -234,8 +230,10 @@ class PersistentMCPServer:
         if self.adapter:
             await self.adapter.cleanup()
         
-        if self.storage:
-            await self.storage.cleanup()
+        if self.storage_backend:
+            # Storage backend cleanup if supported
+            if hasattr(self.storage_backend, 'cleanup'):
+                await self.storage_backend.cleanup()
         
         logger.info("✅ Server cleanup complete")
     
@@ -254,22 +252,13 @@ class PersistentMCPServer:
             "components": {}
         }
         
-        # Check storage
-        if self.storage:
+        # Check storage backend
+        if self.storage_backend:
             try:
-                await self.storage.health_check()
-                status["components"]["storage"] = "healthy"
+                storage_health = await self.storage_backend.health_check()
+                status["components"]["storage"] = storage_health
             except Exception as e:
                 status["components"]["storage"] = f"unhealthy: {e}"
-                status["status"] = "degraded"
-        
-        # Check auth
-        if self.auth:
-            try:
-                await self.auth.health_check()
-                status["components"]["auth"] = "healthy"
-            except Exception as e:
-                status["components"]["auth"] = f"unhealthy: {e}"
                 status["status"] = "degraded"
         
         # Check tools

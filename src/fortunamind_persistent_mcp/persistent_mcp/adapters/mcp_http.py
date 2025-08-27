@@ -29,8 +29,15 @@ except ImportError:
     from ...core.mock import ToolRegistry, AuthContext, ToolResult, ToolSchema
     FRAMEWORK_AVAILABLE = False
 
-from ..storage import StorageBackend
-from ..auth import SubscriberAuth
+# Import new persistence library
+from ...fortunamind_persistence import (
+    EmailIdentity,
+    SubscriptionValidator,
+    FrameworkPersistenceAdapter
+)
+from ...fortunamind_persistence.storage.interfaces import PersistentStorageInterface
+from ...fortunamind_persistence.rate_limiting import RateLimiter
+
 from fortunamind_persistent_mcp.config import Settings
 
 logger = logging.getLogger(__name__)
@@ -39,20 +46,29 @@ logger = logging.getLogger(__name__)
 class HTTPEndpointHandlers:
     """HTTP endpoint handlers for MCP protocol over REST"""
     
-    def __init__(self, registry: ToolRegistry, storage: StorageBackend, auth: SubscriberAuth, settings: Settings):
+    def __init__(self, registry: ToolRegistry, storage_backend: PersistentStorageInterface, settings: Settings):
         """
         Initialize HTTP endpoint handlers
         
         Args:
             registry: Tool registry containing available tools
-            storage: Storage backend for persistence
-            auth: Authentication system
+            storage_backend: Persistent storage implementation
             settings: Application settings
         """
         self.registry = registry
-        self.storage = storage
-        self.auth = auth
         self.settings = settings
+        
+        # Initialize persistence components
+        self.identity = EmailIdentity()
+        self.subscription_validator = SubscriptionValidator()
+        self.rate_limiter = RateLimiter()
+        
+        # Create framework adapter
+        self.persistence_adapter = FrameworkPersistenceAdapter(
+            subscription_validator=self.subscription_validator,
+            storage_backend=storage_backend,
+            rate_limiter=self.rate_limiter
+        )
         
         logger.info("HTTP endpoint handlers initialized")
     
@@ -81,21 +97,19 @@ class HTTPEndpointHandlers:
             # Check component health
             components = {}
             
-            # Storage health
-            if self.storage:
-                try:
-                    storage_health = await self.storage.health_check()
-                    components["storage"] = storage_health.get("status", "unknown")
-                except Exception as e:
-                    components["storage"] = f"unhealthy: {e}"
+            # Storage health via persistence adapter
+            try:
+                storage_health = await self.persistence_adapter.health_check()
+                components["storage"] = storage_health.get("components", {}).get("storage", {}).get("status", "unknown")
+            except Exception as e:
+                components["storage"] = f"unhealthy: {e}"
             
-            # Auth health
-            if self.auth:
-                try:
-                    auth_health = await self.auth.health_check()
-                    components["auth"] = auth_health.get("status", "unknown")
-                except Exception as e:
-                    components["auth"] = f"unhealthy: {e}"
+            # Auth health via persistence adapter
+            try:
+                subscription_health = await self.subscription_validator.health_check()
+                components["subscription_validator"] = subscription_health.get("status", "healthy")
+            except Exception as e:
+                components["subscription_validator"] = f"unhealthy: {e}"
             
             # Tools count
             tools = self.registry.get_tools()
@@ -488,8 +502,7 @@ class MCPHttpAdapter:
     def __init__(
         self,
         registry: ToolRegistry,
-        storage: StorageBackend,
-        auth: SubscriberAuth,
+        storage_backend: PersistentStorageInterface,
         settings: Settings,
         host: str = "0.0.0.0",
         port: Optional[int] = None
@@ -499,8 +512,7 @@ class MCPHttpAdapter:
         
         Args:
             registry: Tool registry containing available tools
-            storage: Storage backend for persistence
-            auth: Authentication system
+            storage_backend: Persistent storage implementation
             settings: Application settings
             host: Server host address
             port: Server port (uses settings.server_port if None)
@@ -509,8 +521,6 @@ class MCPHttpAdapter:
             raise ImportError("FastAPI not available. Install with: pip install fastapi uvicorn")
         
         self.registry = registry
-        self.storage = storage
-        self.auth = auth
         self.settings = settings
         self.host = host
         self.port = port or settings.server_port
@@ -524,8 +534,8 @@ class MCPHttpAdapter:
             redoc_url="/redoc" if settings.is_development() else None
         )
         
-        # Initialize endpoint handlers
-        self.handlers = HTTPEndpointHandlers(registry, storage, auth, settings)
+        # Initialize endpoint handlers with new persistence library
+        self.handlers = HTTPEndpointHandlers(registry, storage_backend, settings)
         
         # Setup routes
         self._setup_routes()
@@ -584,6 +594,10 @@ class MCPHttpAdapter:
     async def initialize(self):
         """Initialize the HTTP adapter"""
         logger.info("Initializing HTTP MCP adapter...")
+        
+        # Initialize persistence components
+        await self.handlers.subscription_validator.initialize()
+        
         logger.info("✅ HTTP MCP adapter ready")
     
     async def start(self):
@@ -628,6 +642,10 @@ class MCPHttpAdapter:
     async def cleanup(self):
         """Cleanup HTTP adapter resources"""
         logger.info("Cleaning up HTTP MCP adapter...")
+        
+        # Cleanup persistence components
+        await self.handlers.subscription_validator.cleanup()
+        
         await self.stop()
         logger.info("✅ HTTP MCP adapter cleanup complete")
     
