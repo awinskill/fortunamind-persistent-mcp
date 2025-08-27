@@ -18,6 +18,7 @@ services:
       
       echo "🗄️ Running database migrations..."
       if [ ! -z "$DATABASE_URL" ]; then
+        export PYTHONPATH="/app/src:$PYTHONPATH"
         alembic upgrade head
         echo "✅ Database migrations completed"
       else
@@ -25,7 +26,7 @@ services:
       fi
       
       echo "🧪 Testing persistence library..."
-      python -c "
+      PYTHONPATH="/app/src:$PYTHONPATH" python -c "
 import sys
 sys.path.insert(0, 'src')
 try:
@@ -37,7 +38,13 @@ except Exception as e:
     print(f'❌ Import error: {e}')
     sys.exit(1)
 "
-    startCommand: python server.py
+      echo "🚀 Build completed - ready to start server"
+    startCommand: |
+      export PYTHONPATH="/app/src:$PYTHONPATH"
+      echo "🚀 Starting FortunaMind Persistent MCP Server..."
+      echo "PYTHONPATH: $PYTHONPATH"
+      echo "PORT: ${PORT:-8000}"
+      python server.py
     plan: starter  # Start with $7/month, upgrade to 'standard' for production
 
     # Environment Configuration
@@ -105,6 +112,8 @@ except Exception as e:
       # Render-specific Configuration
       - key: RENDER
         value: true
+      - key: PYTHONPATH
+        value: /opt/render/project/src
 
     # Health Check Configuration
     healthCheckPath: /health
