@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "fortunamind-persistent": {
+      "command": "python",
+      "args": [
+        "/path/to/fortunamind-persistent-mcp/examples/claude_desktop_integration.py"
+      ],
+      "env": {
+        "FORTUNAMIND_USER_EMAIL": "your-email@domain.com",
+        "FORTUNAMIND_SUBSCRIPTION_KEY": "fm_sub_your_key_here"
+      }
+    }
+  }
+}
