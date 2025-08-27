@@ -35,8 +35,8 @@ RUN pip install --upgrade pip && \
 COPY src/ ./src/
 COPY framework/ ./framework/
 
-# Copy configuration files and README
-COPY pyproject.toml setup.py README.md ./
+# Copy configuration files, README, and server
+COPY pyproject.toml setup.py README.md server.py ./
 
 # Install the package itself for proper imports
 RUN pip install -e .
@@ -48,8 +48,8 @@ RUN mkdir -p /app/logs && \
 # Switch to non-root user
 USER mcpuser
 
-# Set PYTHONPATH to include framework submodule
-ENV PYTHONPATH=/app:/app/framework/src
+# Set PYTHONPATH to include framework submodule and our src
+ENV PYTHONPATH=/app/src:/app/framework/src:/app
 
 # Comprehensive health check using PORT environment variable support
 HEALTHCHECK --interval=30s --timeout=15s --start-period=90s --retries=3 \
@@ -59,5 +59,5 @@ HEALTHCHECK --interval=30s --timeout=15s --start-period=90s --retries=3 \
 EXPOSE 8080
 
 # Production command optimized for Render
-# Use the direct HTTP server startup script
-CMD python -m fortunamind_persistent_mcp.http_server
+# Use our new FastAPI server directly
+CMD python server.py
