@@ -19,6 +19,7 @@ import asyncio
 import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
+from contextlib import asynccontextmanager
 
 # Add src to Python path to ensure imports work
 src_path = os.path.join(os.path.dirname(__file__), 'src')
@@ -66,56 +67,11 @@ config = {
 # Set log level
 logging.getLogger().setLevel(getattr(logging, config['log_level'].upper()))
 
-# Initialize FastAPI app
-app = FastAPI(
-    title="FortunaMind Persistent MCP Server",
-    description="Privacy-first persistent MCP server with email-based identity and subscription management",
-    version="1.0.0",
-    docs_url="/docs" if config['environment'] != 'production' else None,
-    redoc_url="/redoc" if config['environment'] != 'production' else None
-)
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict this to specific origins
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-)
-
-# Global adapter instance
-adapter: Optional[FrameworkPersistenceAdapter] = None
-startup_time = datetime.utcnow()
-
-
-async def get_adapter() -> FrameworkPersistenceAdapter:
-    """Get the global adapter instance"""
-    global adapter
-    if adapter is None:
-        raise HTTPException(status_code=503, detail="Server not initialized")
-    return adapter
-
-
-def extract_user_credentials(
-    request: Request,
-    x_user_email: Optional[str] = Header(None),
-    x_subscription_key: Optional[str] = Header(None),
-    x_coinbase_api_key: Optional[str] = Header(None),
-    x_coinbase_api_secret: Optional[str] = Header(None)
-) -> Dict[str, Optional[str]]:
-    """Extract user credentials from request headers"""
-    return {
-        'email': x_user_email,
-        'subscription_key': x_subscription_key,
-        'coinbase_api_key': x_coinbase_api_key,
-        'coinbase_api_secret': x_coinbase_api_secret
-    }
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize the persistence adapter on startup"""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handle startup and shutdown events"""
+    # Startup
     global adapter
     
     try:
@@ -162,6 +118,60 @@ async def startup_event():
     except Exception as e:
         logger.error(f"❌ Server startup failed: {e}")
         raise
+    
+    yield
+    
+    # Shutdown (if needed)
+    logger.info("🛑 Server shutdown")
+
+
+# Initialize FastAPI app with lifespan
+app = FastAPI(
+    title="FortunaMind Persistent MCP Server",
+    description="Privacy-first persistent MCP server with email-based identity and subscription management",
+    version="1.0.0",
+    docs_url="/docs" if config['environment'] != 'production' else None,
+    redoc_url="/redoc" if config['environment'] != 'production' else None,
+    lifespan=lifespan
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, restrict this to specific origins
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+)
+
+# Global adapter instance
+adapter: Optional[FrameworkPersistenceAdapter] = None
+startup_time = datetime.utcnow()
+
+
+async def get_adapter() -> FrameworkPersistenceAdapter:
+    """Get the global adapter instance"""
+    global adapter
+    if adapter is None:
+        raise HTTPException(status_code=503, detail="Server not initialized")
+    return adapter
+
+
+def extract_user_credentials(
+    request: Request,
+    x_user_email: Optional[str] = Header(None),
+    x_subscription_key: Optional[str] = Header(None),
+    x_coinbase_api_key: Optional[str] = Header(None),
+    x_coinbase_api_secret: Optional[str] = Header(None)
+) -> Dict[str, Optional[str]]:
+    """Extract user credentials from request headers"""
+    return {
+        'email': x_user_email,
+        'subscription_key': x_subscription_key,
+        'coinbase_api_key': x_coinbase_api_key,
+        'coinbase_api_secret': x_coinbase_api_secret
+    }
+
 
 
 @app.get("/")
