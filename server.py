@@ -360,6 +360,252 @@ async def validate_subscription(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
+@app.post("/mcp")
+async def mcp_endpoint(
+    request: Request,
+    credentials: Dict[str, Optional[str]] = Depends(extract_user_credentials),
+    adapter: FrameworkPersistenceAdapter = Depends(get_adapter)
+):
+    """
+    MCP protocol endpoint for HTTP bridge integration.
+    
+    This endpoint accepts JSON-RPC MCP requests and routes them to the appropriate
+    functionality based on the method name.
+    """
+    try:
+        # Parse JSON-RPC request
+        body = await request.json()
+        
+        method = body.get("method")
+        params = body.get("params", {})
+        request_id = body.get("id")
+        
+        logger.info(f"MCP request: {method}")
+        
+        # Route based on MCP method
+        if method == "tools/list":
+            # Return list of available tools
+            tools = [
+                {
+                    "name": "store_journal_entry",
+                    "description": "Store a trading journal entry with persistent storage",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "entry": {"type": "string", "description": "Journal entry content"},
+                            "entry_type": {"type": "string", "description": "Type of entry (trade, analysis, reflection, etc.)"},
+                            "tags": {"type": "array", "items": {"type": "string"}, "description": "Tags for categorization"},
+                            "metadata": {"type": "object", "description": "Additional metadata"}
+                        },
+                        "required": ["entry"]
+                    }
+                },
+                {
+                    "name": "get_journal_entries", 
+                    "description": "Retrieve stored journal entries with filtering",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "limit": {"type": "integer", "description": "Maximum entries to return"},
+                            "offset": {"type": "integer", "description": "Number of entries to skip"},
+                            "entry_type": {"type": "string", "description": "Filter by entry type"}
+                        }
+                    }
+                },
+                {
+                    "name": "get_user_stats",
+                    "description": "Get user statistics and subscription information",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                },
+                {
+                    "name": "validate_subscription",
+                    "description": "Validate user subscription status", 
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
+            ]
+            
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": {"tools": tools}
+            }
+            
+        elif method == "tools/call":
+            # Execute a tool
+            tool_name = params.get("name")
+            arguments = params.get("arguments", {})
+            
+            if tool_name == "store_journal_entry":
+                result = await adapter.store_journal_entry_with_validation(
+                    email=credentials['email'],
+                    subscription_key=credentials['subscription_key'],
+                    entry=arguments.get('entry', ''),
+                    metadata=arguments.get('metadata', {})
+                )
+                
+                return {
+                    "jsonrpc": "2.0", 
+                    "id": request_id,
+                    "result": {
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": f"✅ Journal entry stored successfully!\nEntry ID: {result.get('entry_id', 'unknown')}" if result.get('success') else f"❌ Failed to store entry: {result.get('error', 'Unknown error')}"
+                            }
+                        ]
+                    }
+                }
+                
+            elif tool_name == "get_journal_entries":
+                result = await adapter.get_journal_entries_with_validation(
+                    email=credentials['email'],
+                    subscription_key=credentials['subscription_key'],
+                    limit=arguments.get('limit', 10),
+                    offset=arguments.get('offset', 0),
+                    entry_type=arguments.get('entry_type')
+                )
+                
+                if result.get('success'):
+                    entries_text = "📝 Journal Entries:\n\n"
+                    for i, entry in enumerate(result.get('entries', []), 1):
+                        entries_text += f"{i}. {entry.get('entry', '')[:100]}...\n"
+                        entries_text += f"   Created: {entry.get('created_at', 'unknown')}\n\n"
+                else:
+                    entries_text = f"❌ Failed to retrieve entries: {result.get('error', 'Unknown error')}"
+                
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id, 
+                    "result": {
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": entries_text
+                            }
+                        ]
+                    }
+                }
+                
+            elif tool_name == "get_user_stats":
+                result = await adapter.get_user_stats(
+                    email=credentials['email'],
+                    subscription_key=credentials['subscription_key']
+                )
+                
+                if result.get('success'):
+                    stats_text = f"📊 User Statistics:\n"
+                    stats_text += f"• Total Entries: {result.get('total_entries', 'unknown')}\n"
+                    stats_text += f"• Tier: {result.get('tier', 'unknown')}\n"
+                else:
+                    stats_text = f"❌ Failed to get stats: {result.get('error', 'Unknown error')}"
+                
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "result": {
+                        "content": [
+                            {
+                                "type": "text", 
+                                "text": stats_text
+                            }
+                        ]
+                    }
+                }
+                
+            elif tool_name == "validate_subscription":
+                try:
+                    user_context = await adapter.validate_and_get_user_context(
+                        email=credentials['email'],
+                        subscription_key=credentials['subscription_key']
+                    )
+                    
+                    status_text = f"🎫 Subscription Status:\n"
+                    status_text += f"• Valid: {'✅ Yes' if user_context['is_valid'] else '❌ No'}\n"
+                    status_text += f"• Tier: {user_context['tier']}\n"
+                    status_text += f"• User ID: {user_context['user_id'][:16]}...\n"
+                    
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "result": {
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": status_text
+                                }
+                            ]
+                        }
+                    }
+                    
+                except Exception as e:
+                    return {
+                        "jsonrpc": "2.0", 
+                        "id": request_id,
+                        "result": {
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": f"❌ Subscription validation failed: {str(e)}"
+                                }
+                            ]
+                        }
+                    }
+            
+            else:
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "error": {
+                        "code": -32601,
+                        "message": f"Unknown tool: {tool_name}"
+                    }
+                }
+                
+        elif method == "initialize":
+            # MCP initialization
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {
+                        "tools": {}
+                    },
+                    "serverInfo": {
+                        "name": "FortunaMind Persistent MCP Server",
+                        "version": "1.0.0"
+                    }
+                }
+            }
+            
+        else:
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id, 
+                "error": {
+                    "code": -32601,
+                    "message": f"Unknown method: {method}"
+                }
+            }
+        
+    except Exception as e:
+        logger.error(f"MCP endpoint error: {e}", exc_info=True)
+        return {
+            "jsonrpc": "2.0",
+            "id": body.get("id") if 'body' in locals() else None,
+            "error": {
+                "code": -32603,
+                "message": f"Internal error: {str(e)}"
+            }
+        }
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler"""

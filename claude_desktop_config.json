@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "fortunamind-persistent": {
+      "command": "python3",
+      "args": [
+        "/path/to/fortunamind-persistent-mcp/mcp_http_bridge.py"
+      ],
+      "env": {
+        "FORTUNAMIND_USER_EMAIL": "your-email@domain.com",
+        "FORTUNAMIND_SUBSCRIPTION_KEY": "fm_sub_your_key_here",
+        "COINBASE_API_KEY": "organizations/your-org-id/apiKeys/your-key-id",
+        "COINBASE_API_SECRET": "-----BEGIN EC PRIVATE KEY-----\nYOUR_PEM_PRIVATE_KEY_CONTENT_HERE\n-----END EC PRIVATE KEY-----",
+        "MCP_SERVER_URL": "https://fortunamind-persistent-mcp.onrender.com"
+      }
+    }
+  }
+}

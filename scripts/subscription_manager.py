@@ -336,7 +336,7 @@ async def main():
     # Create subscription command
     create_parser = subparsers.add_parser('create', help='Create new subscription')
     create_parser.add_argument('email', help='User email address')
-    create_parser.add_argument('--tier', choices=['free', 'premium', 'pro'], default='free', help='Subscription tier')
+    create_parser.add_argument('--tier', choices=['free', 'starter', 'premium', 'enterprise'], default='free', help='Subscription tier')
     create_parser.add_argument('--days', type=int, default=365, help='Subscription duration in days')
     
     # Validate subscription command
@@ -351,7 +351,7 @@ async def main():
     # Update tier command
     update_parser = subparsers.add_parser('update', help='Update subscription tier')
     update_parser.add_argument('email', help='User email address')
-    update_parser.add_argument('tier', choices=['free', 'premium', 'pro'], help='New tier')
+    update_parser.add_argument('tier', choices=['free', 'starter', 'premium', 'enterprise'], help='New tier')
     
     # Deactivate subscription command
     deactivate_parser = subparsers.add_parser('deactivate', help='Deactivate subscription')
