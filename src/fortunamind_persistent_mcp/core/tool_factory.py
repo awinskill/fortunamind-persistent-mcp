@@ -69,9 +69,8 @@ class FrameworkToolFactory(ToolFactoryInterface):
     def _check_framework_availability(self) -> bool:
         """Check if framework submodule is available"""
         try:
-            import framework.src.unified_tools
-            # Check if the key tools are available
-            return hasattr(framework.src.unified_tools, 'UnifiedPortfolioTool')
+            from fortunamind_persistent_mcp.core.mock import FRAMEWORK_AVAILABLE
+            return FRAMEWORK_AVAILABLE
         except ImportError:
             return False
     
@@ -94,7 +93,7 @@ class FrameworkToolFactory(ToolFactoryInterface):
             raise ToolCreationError(f"Cannot create framework tool: {tool_type}")
         
         try:
-            from framework.src.unified_tools import (
+            from fortunamind_persistent_mcp.core.mock import (
                 UnifiedPortfolioTool,
                 UnifiedPricesTool, 
                 UnifiedMarketResearchTool
@@ -174,15 +173,31 @@ class MockToolFactory(ToolFactoryInterface):
     
     def create(self, tool_type: ToolType, **kwargs) -> Any:
         """Create mock tool instance"""
-        # Import mock tools
-        from fortunamind_persistent_mcp.core.mock import UnifiedPricesTool
-        
-        # Create appropriate mock based on tool type
-        if tool_type in [ToolType.PRICES, ToolType.PORTFOLIO, ToolType.MARKET_RESEARCH]:
-            return UnifiedPricesTool()  # Generic mock tool
-        
-        # For persistent tools, create minimal mock implementations
-        return self._create_minimal_mock(tool_type, **kwargs)
+        try:
+            # Import mock tools from our proxy system
+            from fortunamind_persistent_mcp.core.mock import (
+                UnifiedPricesTool,
+                UnifiedPortfolioTool,
+                UnifiedMarketResearchTool
+            )
+            
+            # Create appropriate mock based on tool type
+            tool_map = {
+                ToolType.PRICES: UnifiedPricesTool,
+                ToolType.PORTFOLIO: UnifiedPortfolioTool,
+                ToolType.MARKET_RESEARCH: UnifiedMarketResearchTool,
+            }
+            
+            if tool_type in tool_map:
+                tool_class = tool_map[tool_type]
+                return tool_class() if callable(tool_class) else tool_class
+            
+            # For persistent tools, create minimal mock implementations
+            return self._create_minimal_mock(tool_type, **kwargs)
+            
+        except Exception as e:
+            # Fallback to minimal mock if import fails
+            return self._create_minimal_mock(tool_type, **kwargs)
     
     def _create_minimal_mock(self, tool_type: ToolType, **kwargs) -> Any:
         """Create minimal mock implementations for persistent tools"""

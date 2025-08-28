@@ -14,14 +14,8 @@ from fortunamind_persistent_mcp.core.base import ReadOnlyTool, ToolExecutionCont
 from fortunamind_persistent_mcp.persistent_mcp.storage.interface import StorageInterface
 from fortunamind_persistent_mcp.config import Settings
 
-try:
-    # Direct import from framework submodule
-    from framework.src.unified_tools import UnifiedPricesTool
-    FRAMEWORK_AVAILABLE = True
-except ImportError:
-    # Fallback to mock implementation
-    from fortunamind_persistent_mcp.core.mock import UnifiedPricesTool
-    FRAMEWORK_AVAILABLE = False
+# Use our improved mock system that can access framework when available
+from fortunamind_persistent_mcp.core.mock import UnifiedPricesTool, FRAMEWORK_AVAILABLE
 
 logger = logging.getLogger(__name__)
 

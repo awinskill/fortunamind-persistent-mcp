@@ -12,24 +12,9 @@ from typing import Dict, List, Optional, Any, Union
 # Set up logging first
 logger = logging.getLogger(__name__)
 
-# Framework components will be loaded at runtime
-# For now, always use mock classes and detect framework availability later
-FRAMEWORK_AVAILABLE = False
-
-try:
-    # Try to access framework submodule to see if it works
-    import framework.src.unified_tools
-    # Check if the key tools are available
-    if hasattr(framework.src.unified_tools, 'UnifiedPortfolioTool'):
-        logger.info("Framework submodule detected and available")
-        FRAMEWORK_AVAILABLE = True
-    else:
-        logger.warning("Framework submodule exists but tools not found")
-except ImportError as e:
-    logger.warning(f"Framework submodule not available: {e}")
-
 # Clean imports using proper package structure
-from fortunamind_persistent_mcp.core.mock import ToolRegistry, AuthContext, ToolResult
+from fortunamind_persistent_mcp.core.mock import ToolRegistry, AuthContext, ToolResult, FRAMEWORK_AVAILABLE
+from fortunamind_persistent_mcp.core.tool_factory import UnifiedToolFactory, ToolType
 from fortunamind_persistent_mcp.config import Settings
 from .adapters import MCPStdioAdapter, MCPHttpAdapter
 
@@ -38,9 +23,7 @@ from fortunamind_persistence.storage.interfaces import PersistentStorageInterfac
 from fortunamind_persistence.storage.supabase_backend import SupabaseStorage
 from fortunamind_persistence.storage.mock_backend import MockStorage
 
-from .tools.technical_indicators import TechnicalIndicatorsTool
-from .tools.trading_journal import TradingJournalTool
-from .tools.persistent_portfolio import PersistentPortfolioTool
+# Tools will be created through the factory
 
 
 class PersistentMCPServer:
