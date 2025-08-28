@@ -68,7 +68,7 @@ async def test_postgresql_connection():
                     SELECT table_name 
                     FROM information_schema.tables 
                     WHERE table_schema = 'public' 
-                    AND table_name IN ('user_subscriptions', 'journal_entries', 'user_preferences', 'storage_records')
+                    AND table_name IN ('user_subscriptions', 'trading_journal', 'user_preferences', 'storage_records')
                     ORDER BY table_name
                 """))
                 tables = [row[0] for row in result]

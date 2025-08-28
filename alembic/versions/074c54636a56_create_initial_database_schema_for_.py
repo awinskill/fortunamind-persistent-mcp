@@ -38,9 +38,9 @@ def upgrade() -> None:
     # Create index on email for fast lookups
     op.create_index('idx_user_subscriptions_email', 'user_subscriptions', ['email'])
     
-    # Create journal_entries table
+    # Create trading_journal table (trading journal entries)
     op.create_table(
-        'journal_entries',
+        'trading_journal',
         sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
         sa.Column('user_id', sa.String(64), nullable=False),
         sa.Column('entry', sa.Text(), nullable=False),
@@ -51,19 +51,19 @@ def upgrade() -> None:
     )
     
     # Create index on user_id for fast user-specific queries
-    op.create_index('idx_journal_entries_user_id', 'journal_entries', ['user_id'])
+    op.create_index('idx_trading_journal_user_id', 'trading_journal', ['user_id'])
     
     # Create user_preferences table
     op.create_table(
         'user_preferences',
         sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
         sa.Column('user_id', sa.String(64), nullable=False),
-        sa.Column('key', sa.String(255), nullable=False),
-        sa.Column('value', sa.JSON(), nullable=True),
+        sa.Column('preference_key', sa.String(255), nullable=False),
+        sa.Column('preference_value', sa.JSON(), nullable=True),
         sa.Column('created_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('NOW()'), nullable=False),
         sa.Column('updated_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('NOW()'), nullable=False),
         sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('user_id', 'key', name='uq_user_preferences_user_key')
+        sa.UniqueConstraint('user_id', 'preference_key', name='uq_user_preferences_user_key')
     )
     
     # Create index on user_id for preferences
@@ -89,7 +89,7 @@ def upgrade() -> None:
     
     # Enable Row Level Security (RLS) on all user data tables
     # Note: RLS policies will be created in a separate migration for better organization
-    op.execute('ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY')
+    op.execute('ALTER TABLE trading_journal ENABLE ROW LEVEL SECURITY')
     op.execute('ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY')  
     op.execute('ALTER TABLE storage_records ENABLE ROW LEVEL SECURITY')
     
@@ -101,5 +101,5 @@ def downgrade() -> None:
     # Drop tables in reverse order
     op.drop_table('storage_records')
     op.drop_table('user_preferences') 
-    op.drop_table('journal_entries')
+    op.drop_table('trading_journal')
     op.drop_table('user_subscriptions')

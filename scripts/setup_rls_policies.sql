@@ -6,39 +6,39 @@
 -- 3. Proper authentication flow
 
 -- =============================================================================
--- JOURNAL ENTRIES - User's trading journal data
+-- TRADING JOURNAL - User's trading journal data
 -- =============================================================================
 
--- Enable RLS on journal_entries
-ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY;
+-- Enable RLS on trading_journal
+ALTER TABLE trading_journal ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Users can only see their own journal entries
--- Uses user_id_hash from JWT claim or direct comparison
-CREATE POLICY "Users can view own journal entries" ON journal_entries
+-- Uses user_id from JWT claim or direct comparison
+CREATE POLICY "Users can view own journal entries" ON trading_journal
     FOR SELECT USING (
-        user_id_hash = auth.jwt() ->> 'user_id_hash'
-        OR user_id_hash = current_setting('app.user_id_hash', true)
+        user_id = auth.jwt() ->> 'user_id'
+        OR user_id = current_setting('app.user_id', true)
     );
 
 -- Policy: Users can insert their own journal entries
-CREATE POLICY "Users can insert own journal entries" ON journal_entries
+CREATE POLICY "Users can insert own journal entries" ON trading_journal
     FOR INSERT WITH CHECK (
-        user_id_hash = auth.jwt() ->> 'user_id_hash'
-        OR user_id_hash = current_setting('app.user_id_hash', true)
+        user_id = auth.jwt() ->> 'user_id'
+        OR user_id = current_setting('app.user_id', true)
     );
 
 -- Policy: Users can update their own journal entries
-CREATE POLICY "Users can update own journal entries" ON journal_entries
+CREATE POLICY "Users can update own journal entries" ON trading_journal
     FOR UPDATE USING (
-        user_id_hash = auth.jwt() ->> 'user_id_hash'
-        OR user_id_hash = current_setting('app.user_id_hash', true)
+        user_id = auth.jwt() ->> 'user_id'
+        OR user_id = current_setting('app.user_id', true)
     );
 
 -- Policy: Users can delete their own journal entries
-CREATE POLICY "Users can delete own journal entries" ON journal_entries
+CREATE POLICY "Users can delete own journal entries" ON trading_journal
     FOR DELETE USING (
-        user_id_hash = auth.jwt() ->> 'user_id_hash'
-        OR user_id_hash = current_setting('app.user_id_hash', true)
+        user_id = auth.jwt() ->> 'user_id'
+        OR user_id = current_setting('app.user_id', true)
     );
 
 -- =============================================================================
@@ -51,8 +51,8 @@ ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY;
 -- Policy: Users can manage their own preferences
 CREATE POLICY "Users can manage own preferences" ON user_preferences
     FOR ALL USING (
-        user_id_hash = auth.jwt() ->> 'user_id_hash'
-        OR user_id_hash = current_setting('app.user_id_hash', true)
+        user_id = auth.jwt() ->> 'user_id'
+        OR user_id = current_setting('app.user_id', true)
     );
 
 -- =============================================================================
@@ -65,8 +65,8 @@ ALTER TABLE storage_records ENABLE ROW LEVEL SECURITY;
 -- Policy: Users can manage their own storage records
 CREATE POLICY "Users can manage own storage records" ON storage_records
     FOR ALL USING (
-        user_id_hash = auth.jwt() ->> 'user_id_hash'
-        OR user_id_hash = current_setting('app.user_id_hash', true)
+        user_id = auth.jwt() ->> 'user_id'
+        OR user_id = current_setting('app.user_id', true)
     );
 
 -- =============================================================================
@@ -95,11 +95,11 @@ CREATE POLICY "Service role can manage subscriptions" ON user_subscriptions
 -- =============================================================================
 
 -- Function to set user context (called by application)
-CREATE OR REPLACE FUNCTION set_user_context(user_id_hash_param text, user_email_param text)
+CREATE OR REPLACE FUNCTION set_user_context(user_id_param text, user_email_param text)
 RETURNS void AS $$
 BEGIN
     -- Set the user context for RLS policies
-    PERFORM set_config('app.user_id_hash', user_id_hash_param, true);
+    PERFORM set_config('app.user_id', user_id_param, true);
     PERFORM set_config('app.user_email', lower(trim(user_email_param)), true);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -108,7 +108,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION clear_user_context()
 RETURNS void AS $$
 BEGIN
-    PERFORM set_config('app.user_id_hash', '', true);
+    PERFORM set_config('app.user_id', '', true);
     PERFORM set_config('app.user_email', '', true);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -117,11 +117,11 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- SECURITY FUNCTIONS
 -- =============================================================================
 
--- Function to validate user_id_hash format (SHA-256 hex string)
-CREATE OR REPLACE FUNCTION is_valid_user_id_hash(hash text)
+-- Function to validate user_id format (hash string)
+CREATE OR REPLACE FUNCTION is_valid_user_id(user_id text)
 RETURNS boolean AS $$
 BEGIN
-    RETURN hash ~ '^[a-f0-9]{64}$';
+    RETURN user_id ~ '^[a-zA-Z0-9_-]{8,64}$';
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
@@ -138,15 +138,14 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 -- =============================================================================
 
 -- Indexes for efficient RLS policy enforcement
-CREATE INDEX IF NOT EXISTS idx_journal_entries_user_id_hash ON journal_entries(user_id_hash);
-CREATE INDEX IF NOT EXISTS idx_journal_entries_created_at ON journal_entries(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_journal_entries_entry_type ON journal_entries(entry_type);
+CREATE INDEX IF NOT EXISTS idx_trading_journal_user_id ON trading_journal(user_id);
+CREATE INDEX IF NOT EXISTS idx_trading_journal_created_at ON trading_journal(created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_user_preferences_user_id_hash ON user_preferences(user_id_hash);
+CREATE INDEX IF NOT EXISTS idx_user_preferences_user_id ON user_preferences(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_preferences_key ON user_preferences(preference_key);
 
-CREATE INDEX IF NOT EXISTS idx_storage_records_user_id_hash ON storage_records(user_id_hash);
-CREATE INDEX IF NOT EXISTS idx_storage_records_key ON storage_records(record_key);
+CREATE INDEX IF NOT EXISTS idx_storage_records_user_id ON storage_records(user_id);
+CREATE INDEX IF NOT EXISTS idx_storage_records_type ON storage_records(record_type);
 
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_email ON user_subscriptions(email);
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_status ON user_subscriptions(status);
@@ -158,11 +157,11 @@ CREATE INDEX IF NOT EXISTS idx_user_subscriptions_status ON user_subscriptions(s
 -- Query to verify RLS is enabled on all tables
 SELECT schemaname, tablename, rowsecurity 
 FROM pg_tables 
-WHERE tablename IN ('journal_entries', 'user_preferences', 'storage_records', 'user_subscriptions')
+WHERE tablename IN ('trading_journal', 'user_preferences', 'storage_records', 'user_subscriptions')
 AND schemaname = 'public';
 
 -- Query to list all RLS policies
 SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual 
 FROM pg_policies 
-WHERE tablename IN ('journal_entries', 'user_preferences', 'storage_records', 'user_subscriptions')
+WHERE tablename IN ('trading_journal', 'user_preferences', 'storage_records', 'user_subscriptions')
 ORDER BY tablename, policyname;
